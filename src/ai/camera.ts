@@ -46,7 +46,7 @@ export function describeCameraError(err: unknown): string {
   switch (name) {
     case 'NotAllowedError':
     case 'PermissionDeniedError':
-      return 'Camera permission was blocked. Allow the camera for this site in the browser’s address-bar settings, then press Start again.';
+      return 'Camera permission was blocked. Allow the camera for this site in the browser’s address-bar settings (on a phone, the browser app also needs camera permission in the phone’s settings), then press Start camera.';
     case 'NotFoundError':
     case 'DevicesNotFoundError':
       return 'No camera was found. Connect a camera, or choose another source.';

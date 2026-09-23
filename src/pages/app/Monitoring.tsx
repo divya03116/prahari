@@ -677,6 +677,28 @@ export default function Monitoring() {
     return () => navigator.mediaDevices?.removeEventListener?.('devicechange', onChange);
   }, []);
 
+  // Camera allowed after a refusal (address-bar or site settings): start by itself,
+  // instead of leaving the old "permission was blocked" message until Start is pressed.
+  useEffect(() => {
+    let status: PermissionStatus | null = null;
+    let cancelled = false;
+    const onChange = () => {
+      if (status?.state === 'granted' && cfgRef.current.autoStart && !runningRef.current) void startRef.current(true);
+    };
+    navigator.permissions
+      ?.query({ name: 'camera' as PermissionName })
+      .then((s) => {
+        if (cancelled) return;
+        status = s;
+        s.addEventListener('change', onChange);
+      })
+      .catch(() => undefined); // not every browser can report the camera permission
+    return () => {
+      cancelled = true;
+      status?.removeEventListener('change', onChange);
+    };
+  }, []);
+
   const setting = (key: keyof PpeSettings, label: string, step: number, hint: string) => {
     const [min, max] = PPE_SETTINGS_LIMITS[key];
     return (
