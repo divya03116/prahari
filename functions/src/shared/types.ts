@@ -1,0 +1,203 @@
+/**
+ * Firestore document shapes. Canonical source: functions/src/shared/ — synced
+ * into src/shared/. These describe what is STORED; the security rules and the
+ * callables are what enforce it.
+ *
+ * `TimestampLike` is structural so the same types serve the Admin SDK
+ * (firebase-admin Timestamp) and the web SDK (firebase/firestore Timestamp),
+ * which are different classes with the same shape.
+ */
+
+import type {
+  ActionStatus,
+  ReportType,
+  Role,
+  Shift,
+  Tier,
+  Verdict,
+} from './constants.js';
+import type { Assessment, CapaStep } from './engine.js';
+import type { HazardType, ZoneKind } from './hazards.js';
+import type { Box, PpeSettings, PpeState, PpeType } from './ppe.js';
+import type { ReportSource, StructuredIncident } from './structure.js';
+
+/** What the camera and model saw when a PPE violation was confirmed. */
+export interface PpeEvidence {
+  violations: { type: PpeType; trackId: number; personConfidence: number; frames: number; seconds: number }[];
+  workers: { trackId: number; box: Box; confidence: number; ppe: Record<string, { state: PpeState; confidence: number | null }> }[];
+  required: PpeType[];
+  frame: { width: number; height: number };
+  evidencePath: string;
+  model: { name: string; architecture: string; backend: 'webgpu' | 'wasm' | 'remote'; classes: string[] };
+  settings: PpeSettings;
+  detectedAt: TimestampLike;
+}
+
+/** What the camera and models saw when a hazard (not PPE) was confirmed. */
+export interface HazardEvidence {
+  key: string;
+  type: HazardType;
+  frames: number;
+  seconds: number;
+  subject: { label: string; confidence: number; box: Box };
+  other?: { label: string; confidence: number; box: Box };
+  zone?: { id: string; name: string; kind: ZoneKind };
+  objects?: string[];
+  method?: 'pose' | 'box';
+  frame: { width: number; height: number };
+  evidencePath: string;
+  models: { role: string; name: string; architecture: string }[];
+  settings: { minConfidence: number; incidentCooldownSeconds: number };
+  detectedAt: TimestampLike;
+}
+
+/** What the AI photo check found in a worker's photo, when it drafted the report. */
+export interface PhotoCheck {
+  models: string[];
+  findings: { type: string; confidence: number }[];
+}
+
+/** A worker's own account attached to an incident. uid only, never a name. */
+export interface Statement {
+  id: string;
+  text: string;
+  source: 'text' | 'voice';
+  by: string;
+  at: TimestampLike;
+}
+
+export interface TimestampLike {
+  seconds: number;
+  nanoseconds: number;
+  toMillis(): number;
+  toDate(): Date;
+}
+
+/* users/{uid} */
+export interface UserDoc {
+  email: string;
+  displayName: string;
+  role: Role;
+  installationId: string | null;
+  disabled: boolean;
+  createdAt: TimestampLike;
+  lastSeenAt: TimestampLike;
+}
+
+/* installations/{id}, activities/{id} */
+export interface ReferenceDoc {
+  name: string;
+  code: string;
+  region: string;
+  active: boolean;
+  createdAt: TimestampLike;
+  updatedAt: TimestampLike;
+}
+
+export interface AttachmentMeta {
+  path: string;
+  name: string;
+  size: number;
+  contentType: string;
+}
+
+export interface VerdictRecord {
+  decision: Verdict;
+  note: string;
+  officerUid: string;
+  officerName: string;
+  at: TimestampLike;
+}
+
+export type ReportStatus = 'pending' | 'scored' | 'failed';
+
+/* reports/{id} */
+export interface ReportDoc extends Partial<Omit<Assessment, 'tier'>> {
+  text: string;
+  installationId: string;
+  installationName: string;
+  activityId: string | null;
+  activityName: string;
+  shift: Shift;
+  type: ReportType;
+  contractor: boolean;
+  attachments: AttachmentMeta[];
+  status: ReportStatus;
+  /** A uid only. The reporter's name is never stored on a report. */
+  reportedBy: string;
+  createdAt: TimestampLike;
+  archived: boolean;
+  /* written only by the server */
+  tier?: Tier;
+  searchTokens?: string[];
+  capa?: CapaStep[];
+  scoredAt?: TimestampLike;
+  error?: string;
+  verdict?: VerdictRecord;
+  /** Mirrors verdict.decision; null until an officer reviews the report. */
+  verdictDecision: Verdict | null;
+  /* incident sources (absent on reports filed before these features) */
+  source?: ReportSource;
+  geo?: { lat: number; lng: number; accuracy: number | null } | null;
+  structured?: StructuredIncident;
+  camera?: { id: string; label: string; kind: 'device' | 'stream' };
+  ppe?: PpeEvidence;
+  hazard?: HazardEvidence;
+  photoCheck?: PhotoCheck | null;
+  statements?: Statement[];
+  archivedAt?: TimestampLike;
+  archivedBy?: string;
+  archiveReason?: string;
+}
+
+/* actions/{id} */
+export interface ActionDoc {
+  reportId: string;
+  /** The report's author (uid), copied so the rules can show people their own report's actions. */
+  reportedBy: string | null;
+  installationId: string;
+  installationName: string;
+  tier: Tier;
+  order: number;
+  control: string;
+  rationale: string;
+  owner: string;
+  dueAt: TimestampLike;
+  status: ActionStatus;
+  source: 'engine' | 'manual';
+  note: string;
+  createdAt: TimestampLike;
+  updatedAt: TimestampLike;
+  closedAt: TimestampLike | null;
+  closedBy: string | null;
+}
+
+/* heat/{installationId__YYYY-MM-DD} */
+export interface HeatDoc {
+  installationId: string;
+  installationName: string;
+  day: string;
+  peak: number;
+  count: number;
+}
+
+/* stats/{YYYY-MM-DD} — daily roll-up for the dashboard trend */
+export interface DailyStatsDoc {
+  day: string;
+  total: number;
+  t1: number;
+  t2: number;
+  t3: number;
+}
+
+/* auditLogs/{id} */
+export interface AuditDoc {
+  action: string;
+  actorUid: string | null;
+  actorName: string | null;
+  target: string | null;
+  detail: Record<string, unknown>;
+  at: TimestampLike;
+}
+
+export type WithId<T> = T & { id: string };

@@ -1,0 +1,61 @@
+rules_version = '2';
+
+/**
+ * PRAHARI — Cloud Storage security rules.
+ *
+ * Report attachments live at attachments/{uid}/{reportId}/{file}. A user can
+ * upload only into their own folder, only accepted types, only under 10 MB.
+ *
+ * Uploads happen BEFORE the report exists (the report id is generated in the
+ * browser, files are uploaded, then submitReport records them), so a user may
+ * remove their own file while the report does not exist yet — i.e. while they
+ * are still editing the form. Once the report is filed, its attachments are
+ * evidence and become immutable. submitReport independently re-verifies every
+ * path, size and type server-side before recording it.
+ */
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function verified() {
+      return request.auth != null
+        && (request.auth.token.email_verified == true
+            || request.auth.token.firebase.sign_in_provider in ['google.com', 'apple.com', 'phone']);
+    }
+
+    function reportFiled(reportId) {
+      return firestore.exists(/databases/(default)/documents/reports/$(reportId));
+    }
+
+    // Same visibility as the report itself: its author, HSE officers and
+    // administrators, and the manager of the report's installation.
+    function canSeeReport(uid, reportId) {
+      return request.auth.uid == uid
+        || request.auth.token.get('role', 'reviewer') in ['hse-officer', 'admin']
+        || (request.auth.token.get('role', 'reviewer') == 'installation-manager'
+            && firestore.get(/databases/(default)/documents/reports/$(reportId)).data.installationId
+               == firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.installationId);
+    }
+
+    match /attachments/{uid}/{reportId}/{fileName} {
+      allow read: if verified() && canSeeReport(uid, reportId);
+
+      allow create: if verified()
+        && request.auth.uid == uid
+        && !reportFiled(reportId)
+        && fileName.size() <= 200
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)|application/pdf');
+
+      allow delete: if verified()
+        && request.auth.uid == uid
+        && !reportFiled(reportId);
+
+      allow update: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

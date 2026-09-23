@@ -1,0 +1,58 @@
+{
+  "name": "prahari",
+  "private": true,
+  "version": "3.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "sync": "node scripts/sync-shared.mjs",
+    "predev": "npm run sync",
+    "dev": "vite",
+    "prebuild": "npm run sync",
+    "build": "npm run typecheck && vite build",
+    "build:vercel": "npm run sync && npm run typecheck && vite build --mode vercel --outDir deploy/prahari --emptyOutDir && node -e \"const c=require('./vercel.json');for(const k of ['installCommand','buildCommand','outputDirectory'])delete c[k];require('fs').writeFileSync('deploy/prahari/vercel.json',JSON.stringify(c,null,2))\"",
+    "typecheck": "tsc -b",
+    "preview": "vite preview --port 4173 --strictPort",
+    "functions:build": "npm --prefix functions run build",
+    "emulators": "npm run functions:build && firebase emulators:start --project demo-prahari",
+    "seed": "node scripts/seed.mjs",
+    "test:engine": "npm run functions:build && node scripts/engine-test.mjs",
+    "test:rules": "node scripts/rules-test.mjs",
+    "test:e2e": "playwright test",
+    "test": "npm run test:engine && npm run test:ppe && npm run test:hazards && npm run test:rules && npm run test:cleanup && npm run test:e2e",
+    "indexes": "node scripts/gen-indexes.mjs",
+    "test:cleanup": "node scripts/cleanup-test.mjs",
+    "test:ppe": "npm run functions:build && node scripts/ppe-test.mjs",
+    "test:hazards": "npm run functions:build && node scripts/hazard-test.mjs"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "clsx": "^2.1.1",
+    "firebase": "^12.19.0",
+    "lucide-react": "^0.544.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.62.0",
+    "react-router-dom": "^7.18.4",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/vite": "^4.1.13",
+    "@types/node": "^22.18.0",
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "firebase-tools": "^15.30.2",
+    "tailwindcss": "^4.1.13",
+    "typescript": "~5.9.2",
+    "vite": "^6.3.6"
+  }
+}

@@ -1,0 +1,191 @@
+@import 'tailwindcss';
+
+/* ==================================================================
+ * PRAHARI design system — tokens.
+ *
+ * Graphite neutrals with a faint cool cast; one brand colour, "signal",
+ * used sparingly for focus, the brand mark, the active navigation marker
+ * and links. The four status colours each mean exactly one thing:
+ *   critical = Tier 1   warning = Tier 2   success = Tier 3 / done   info
+ * They are never decoration. In a safety product colour is data.
+ *
+ * Everything below is exposed as Tailwind utilities (bg-surface,
+ * text-fg-muted, border-border, rounded-md, text-sm …) so components never
+ * hard-code a value.
+ * ================================================================== */
+
+@theme {
+  --font-sans:
+    'Plus Jakarta Sans', 'IBM Plex Sans Devanagari', 'Noto Sans Bengali', ui-sans-serif, system-ui,
+    -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:
+    'IBM Plex Mono', 'IBM Plex Sans Devanagari', 'Noto Sans Bengali', ui-monospace, SFMono-Regular,
+    Menlo, monospace;
+
+  /* surfaces — each step is one elevation */
+  --color-canvas: #09090b;
+  --color-surface: #131316;
+  --color-surface-2: #18181c;
+  --color-surface-3: #202025;
+  --color-overlay: #1a1a1e;
+
+  /* lines */
+  --color-border: #232328;
+  --color-border-strong: #313137;
+
+  /* text */
+  --color-fg: #f4f4f5;
+  --color-fg-muted: #a1a1aa;
+  --color-fg-subtle: #75757f;
+  --color-fg-inverse: #09090b;
+
+  /* brand */
+  --color-signal: #8b7cf6;
+  --color-signal-hover: #9d90f8;
+  --color-signal-soft: rgb(139 124 246 / 0.14);
+
+  /* dashboard accents */
+  --color-lime: #c9e265;
+  --color-mint: #7fd49a;
+  --color-violet-deep: #2a2640;
+
+  /* status */
+  --color-critical: #eb5757;
+  --color-critical-soft: rgb(235 87 87 / 0.12);
+  --color-critical-line: rgb(235 87 87 / 0.35);
+  --color-warning: #e5a50a;
+  --color-warning-soft: rgb(229 165 10 / 0.12);
+  --color-warning-line: rgb(229 165 10 / 0.35);
+  --color-success: #3fa66d;
+  --color-success-soft: rgb(63 166 109 / 0.13);
+  --color-success-line: rgb(63 166 109 / 0.35);
+  --color-info: #5b8def;
+  --color-info-soft: rgb(91 141 239 / 0.13);
+  --color-info-line: rgb(91 141 239 / 0.35);
+
+  /* type scale — restrained on purpose; the largest heading in the app is 24px */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.375rem;
+  --text-md: 0.9375rem;
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.5rem;
+  --text-4xl: 2.75rem;
+  --text-4xl--line-height: 3.125rem;
+
+  /* radii — soft cards, pill controls */
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --shadow-overlay: 0 1px 0 0 rgb(255 255 255 / 0.04) inset, 0 16px 48px -12px rgb(0 0 0 / 0.7);
+  --shadow-raised: 0 1px 0 0 rgb(255 255 255 / 0.03) inset, 0 1px 2px 0 rgb(0 0 0 / 0.4);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-fade-in: fade-in 160ms var(--ease-out);
+  --animate-scale-in: scale-in 180ms var(--ease-out);
+  --animate-slide-in-left: slide-in-left 220ms var(--ease-out);
+  --animate-shimmer: shimmer 1.4s linear infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Base
+ * ------------------------------------------------------------------ */
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-base text-fg antialiased;
+    font-feature-settings: 'ss01' on;
+  }
+
+  ::selection {
+    background: rgb(139 124 246 / 0.35);
+  }
+
+  /* Focus is always visible for keyboard users and never shown on mouse click. */
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+  }
+
+  /* Numbers that line up in columns. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Thin, low-contrast scrollbars that do not fight the content. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+
+  /* <mark> ships a yellow UA default; evidence highlighting sets its own. */
+  mark {
+    background: transparent;
+    color: inherit;
+  }
+}
+
+/* Motion is a channel, not decoration: when asked for less, give none. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

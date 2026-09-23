@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PRAHARI — SIF Precursor Intelligence</title>
+    <meta
+      name="description"
+      content="PRAHARI reads unsafe-act, unsafe-condition and near-miss reports and scores their serious-injury and fatality potential — what each event could have become, not the injury it recorded."
+    />
+    <meta name="theme-color" content="#09090b" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content="PRAHARI — SIF Precursor Intelligence" />
+    <meta
+      property="og:description"
+      content="Scores what a safety report could have become, not the outcome it recorded."
+    />
+    <meta property="og:type" content="website" />
+
+    <!--
+      Plus Jakarta Sans for Latin, IBM Plex Mono for codes; IBM Plex Sans
+      Devanagari and Noto Sans Bengali behind them in every stack. The Latin faces carry no Indic glyphs,
+      so without these every Hindi, Assamese and Bengali report would fall back
+      to whatever the operating system has, or render as boxes.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>PRAHARI requires JavaScript.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

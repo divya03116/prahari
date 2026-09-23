@@ -1,0 +1,422 @@
+/**
+ * PPE compliance logic, independent of any particular model or camera.
+ * Canonical source: functions/src/shared/ — synced into src/shared/.
+ *
+ *   detections (from any YOLO model) → per-worker PPE association
+ *   → frame-to-frame worker tracking → safety rules
+ *   → multi-frame confirmation → de-duplicated violation events
+ *
+ * A missing item is never a detected object. "Helmet missing" means: a person
+ * was detected, the area requires a helmet, and no helmet was found where a
+ * helmet on that person would be — for long enough to be sure.
+ */
+
+/* ------------------------------------------------------------------ *
+ * Types
+ * ------------------------------------------------------------------ */
+
+/** Pixel box in the source frame's coordinates. */
+export interface Box {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export interface Detection {
+  label: string;
+  confidence: number;
+  box: Box;
+}
+
+/** Every PPE type the rules understand. A model may support a subset. */
+export const PPE_TYPES = ['helmet', 'vest', 'harness', 'gloves', 'boots', 'goggles'] as const;
+export type PpeType = (typeof PPE_TYPES)[number];
+
+export const PPE_LABEL: Record<PpeType, string> = {
+  helmet: 'Safety helmet',
+  vest: 'Safety vest',
+  harness: 'Safety harness',
+  gloves: 'Gloves',
+  boots: 'Safety boots',
+  goggles: 'Safety goggles',
+};
+
+export interface PpeSettings {
+  /** Minimum model confidence for any detection to count. */
+  minConfidence: number;
+  /** Consecutive frames an item must be missing before a violation is confirmed. */
+  confirmationFrames: number;
+  /** …and for at least this long. */
+  violationSeconds: number;
+  /** After an incident, no new incident of the same type from the same camera for this long. */
+  incidentCooldownSeconds: number;
+}
+
+export const DEFAULT_PPE_SETTINGS: PpeSettings = {
+  minConfidence: 0.6,
+  confirmationFrames: 10,
+  violationSeconds: 2,
+  incidentCooldownSeconds: 300,
+};
+
+export const PPE_SETTINGS_LIMITS = {
+  minConfidence: [0.25, 0.95],
+  confirmationFrames: [3, 120],
+  violationSeconds: [0.5, 60],
+  incidentCooldownSeconds: [30, 86_400],
+} as const;
+
+/* ------------------------------------------------------------------ *
+ * Geometry
+ * ------------------------------------------------------------------ */
+
+const area = (b: Box): number => Math.max(0, b.x2 - b.x1) * Math.max(0, b.y2 - b.y1);
+
+function intersection(a: Box, b: Box): number {
+  const w = Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1);
+  const h = Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1);
+  return w > 0 && h > 0 ? w * h : 0;
+}
+
+export function iou(a: Box, b: Box): number {
+  const i = intersection(a, b);
+  const u = area(a) + area(b) - i;
+  return u > 0 ? i / u : 0;
+}
+
+/** Class-aware non-maximum suppression. */
+export function nms(dets: Detection[], iouThreshold = 0.45): Detection[] {
+  const out: Detection[] = [];
+  const byLabel = new Map<string, Detection[]>();
+  for (const d of dets) byLabel.set(d.label, [...(byLabel.get(d.label) ?? []), d]);
+  for (const group of byLabel.values()) {
+    const sorted = [...group].sort((a, b) => b.confidence - a.confidence);
+    const keep: Detection[] = [];
+    for (const d of sorted) if (keep.every((k) => iou(k.box, d.box) < iouThreshold)) keep.push(d);
+    out.push(...keep);
+  }
+  return out.sort((a, b) => b.confidence - a.confidence);
+}
+
+/* ------------------------------------------------------------------ *
+ * YOLOv8 output decoding
+ * ------------------------------------------------------------------ */
+
+/** How the frame was letterboxed into the square model input. */
+export interface Letterbox {
+  scale: number;
+  padX: number;
+  padY: number;
+  srcWidth: number;
+  srcHeight: number;
+}
+
+export function letterbox(srcWidth: number, srcHeight: number, size: number): Letterbox {
+  const scale = Math.min(size / srcWidth, size / srcHeight);
+  return {
+    scale,
+    padX: (size - srcWidth * scale) / 2,
+    padY: (size - srcHeight * scale) / 2,
+    srcWidth,
+    srcHeight,
+  };
+}
+
+/**
+ * Decodes a YOLOv8 detection head: tensor [1, 4 + C, N], rows = cx, cy, w, h
+ * (model-input pixels) then one score per class. Returns boxes in source-frame
+ * pixels after confidence filtering and class-wise NMS.
+ */
+export function decodeYolov8(
+  data: ArrayLike<number>,
+  dims: readonly number[],
+  classes: readonly string[],
+  lb: Letterbox,
+  minConfidence: number,
+  iouThreshold = 0.45,
+): Detection[] {
+  const [, rows, n] = dims;
+  const nc = rows - 4;
+  if (nc !== classes.length) throw new Error(`Model output has ${nc} classes, manifest lists ${classes.length}.`);
+  const dets: Detection[] = [];
+  for (let i = 0; i < n; i++) {
+    let best = -1;
+    let score = 0;
+    for (let c = 0; c < nc; c++) {
+      const s = data[(4 + c) * n + i];
+      if (s > score) {
+        score = s;
+        best = c;
+      }
+    }
+    if (best < 0 || score < minConfidence) continue;
+    const cx = data[i];
+    const cy = data[n + i];
+    const w = data[2 * n + i];
+    const h = data[3 * n + i];
+    const clampX = (v: number) => Math.min(lb.srcWidth, Math.max(0, v));
+    const clampY = (v: number) => Math.min(lb.srcHeight, Math.max(0, v));
+    const box: Box = {
+      x1: clampX((cx - w / 2 - lb.padX) / lb.scale),
+      y1: clampY((cy - h / 2 - lb.padY) / lb.scale),
+      x2: clampX((cx + w / 2 - lb.padX) / lb.scale),
+      y2: clampY((cy + h / 2 - lb.padY) / lb.scale),
+    };
+    if (area(box) > 0) dets.push({ label: classes[best], confidence: score, box });
+  }
+  return nms(dets, iouThreshold);
+}
+
+/* ------------------------------------------------------------------ *
+ * Worker ↔ PPE association
+ * ------------------------------------------------------------------ */
+
+/**
+ * Where on a person each item is worn, as fractions of the person box
+ * (top, bottom), measured from the top. The helmet band starts above the box
+ * because a helmet often sticks out over the detected person outline.
+ */
+const WORN_REGION: Record<PpeType, [number, number]> = {
+  helmet: [-0.15, 0.35],
+  goggles: [-0.05, 0.3],
+  vest: [0.12, 0.75],
+  harness: [0.1, 0.75],
+  gloves: [0.2, 1.0],
+  boots: [0.65, 1.1],
+};
+
+export type PpeState = 'present' | 'missing';
+
+export interface WorkerPpe {
+  person: Detection;
+  ppe: Partial<Record<PpeType, { state: PpeState; confidence: number | null }>>;
+}
+
+/**
+ * Assigns each PPE detection to at most one person — the one whose worn
+ * region contains the item's centre and overlaps it most — and marks each
+ * required item present or missing for every person.
+ */
+export function associate(
+  detections: readonly Detection[],
+  required: readonly PpeType[],
+  minConfidence: number,
+  personLabel = 'person',
+): WorkerPpe[] {
+  const people = detections.filter((d) => d.label === personLabel && d.confidence >= minConfidence);
+  const workers: WorkerPpe[] = people.map((person) => ({ person, ppe: {} }));
+  const best = new Map<string, number>(); // `${worker}:${type}` -> confidence
+
+  for (const item of detections) {
+    const type = item.label as PpeType;
+    if (!required.includes(type) || item.confidence < minConfidence) continue;
+    const cx = (item.box.x1 + item.box.x2) / 2;
+    const cy = (item.box.y1 + item.box.y2) / 2;
+    let owner = -1;
+    let ownerScore = 0;
+    people.forEach((p, idx) => {
+      const h = p.box.y2 - p.box.y1;
+      const w = p.box.x2 - p.box.x1;
+      const [top, bottom] = WORN_REGION[type];
+      const region: Box = { x1: p.box.x1 - 0.1 * w, x2: p.box.x2 + 0.1 * w, y1: p.box.y1 + top * h, y2: p.box.y1 + bottom * h };
+      if (cx < region.x1 || cx > region.x2 || cy < region.y1 || cy > region.y2) return;
+      const overlap = intersection(item.box, region) / Math.max(1, area(item.box));
+      if (overlap > ownerScore) {
+        ownerScore = overlap;
+        owner = idx;
+      }
+    });
+    if (owner < 0) continue;
+    const key = `${owner}:${type}`;
+    best.set(key, Math.max(best.get(key) ?? 0, item.confidence));
+  }
+
+  for (const [idx, w] of workers.entries()) {
+    for (const type of required) {
+      const c = best.get(`${idx}:${type}`);
+      w.ppe[type] = c === undefined ? { state: 'missing', confidence: null } : { state: 'present', confidence: c };
+    }
+  }
+  return workers;
+}
+
+/* ------------------------------------------------------------------ *
+ * Tracking — stable worker ids across frames (greedy IoU matching)
+ * ------------------------------------------------------------------ */
+
+export interface Track {
+  id: number;
+  box: Box;
+  lastSeen: number;
+  missedFrames: number;
+}
+
+export class IouTracker {
+  private tracks: Track[] = [];
+  private nextId = 1;
+
+  constructor(
+    private readonly minIou = 0.3,
+    private readonly maxMissedFrames = 15,
+  ) {}
+
+  /** Returns the track id for each input box, in order. */
+  update(boxes: readonly Box[], now: number): number[] {
+    const ids = new Array<number>(boxes.length).fill(0);
+    const pairs: { t: number; b: number; score: number }[] = [];
+    this.tracks.forEach((t, ti) =>
+      boxes.forEach((b, bi) => {
+        const s = iou(t.box, b);
+        if (s >= this.minIou) pairs.push({ t: ti, b: bi, score: s });
+      }),
+    );
+    pairs.sort((a, b) => b.score - a.score);
+    const usedT = new Set<number>();
+    const usedB = new Set<number>();
+    for (const p of pairs) {
+      if (usedT.has(p.t) || usedB.has(p.b)) continue;
+      usedT.add(p.t);
+      usedB.add(p.b);
+      const t = this.tracks[p.t];
+      t.box = boxes[p.b];
+      t.lastSeen = now;
+      t.missedFrames = 0;
+      ids[p.b] = t.id;
+    }
+    this.tracks.forEach((t, ti) => {
+      if (!usedT.has(ti)) t.missedFrames++;
+    });
+    this.tracks = this.tracks.filter((t) => t.missedFrames <= this.maxMissedFrames);
+    boxes.forEach((b, bi) => {
+      if (usedB.has(bi)) return;
+      const t: Track = { id: this.nextId++, box: b, lastSeen: now, missedFrames: 0 };
+      this.tracks.push(t);
+      ids[bi] = t.id;
+    });
+    return ids;
+  }
+
+  reset(): void {
+    this.tracks = [];
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Rules — confirmation and de-duplication
+ * ------------------------------------------------------------------ */
+
+export interface WorkerStatus {
+  trackId: number;
+  person: Detection;
+  ppe: WorkerPpe['ppe'];
+  /** Per missing item: how close it is to confirmation (0..1). */
+  pending: Partial<Record<PpeType, number>>;
+  /** Items whose violation is confirmed and still continuing. */
+  confirmed: PpeType[];
+}
+
+export interface ViolationEvent {
+  type: PpeType;
+  trackId: number;
+  person: Detection;
+  frames: number;
+  seconds: number;
+  since: number;
+}
+
+interface Streak {
+  frames: number;
+  since: number;
+  lastSeen: number;
+  reported: boolean;
+}
+
+/** A streak survives brief gaps in person detection (flicker, occlusion). */
+const STREAK_GRACE_MS = 1500;
+
+/**
+ * Turns per-frame association into confirmed, de-duplicated violations.
+ *
+ * - A violation is confirmed only after `confirmationFrames` consecutive
+ *   frames AND `violationSeconds` of the item being missing on the same
+ *   tracked worker. One frame with the item present resets it.
+ * - A continuing violation is reported once, however long it lasts.
+ * - After a report, the same type from the same camera is not reported again
+ *   for `incidentCooldownSeconds`, even if the tracker re-numbers the worker.
+ */
+export class ComplianceMonitor {
+  private streaks = new Map<string, Streak>();
+  private lastReported = new Map<PpeType, number>();
+  private readonly tracker = new IouTracker();
+
+  constructor(
+    private settings: PpeSettings,
+    private required: PpeType[],
+    private readonly personLabel = 'person',
+  ) {}
+
+  configure(settings: PpeSettings, required: PpeType[]): void {
+    this.settings = settings;
+    this.required = required;
+    this.streaks.clear();
+  }
+
+  reset(): void {
+    this.streaks.clear();
+    this.tracker.reset();
+  }
+
+  /** Marks a type as reported now (e.g. the server confirmed an incident). */
+  markReported(type: PpeType, at: number): void {
+    this.lastReported.set(type, at);
+  }
+
+  update(detections: readonly Detection[], now: number): { workers: WorkerStatus[]; events: ViolationEvent[] } {
+    const workers = associate(detections, this.required, this.settings.minConfidence, this.personLabel);
+    const ids = this.tracker.update(
+      workers.map((w) => w.person.box),
+      now,
+    );
+    const events: ViolationEvent[] = [];
+
+    const statuses = workers.map((w, i): WorkerStatus => {
+      const trackId = ids[i];
+      const status: WorkerStatus = { trackId, person: w.person, ppe: w.ppe, pending: {}, confirmed: [] };
+      for (const type of this.required) {
+        const key = `${trackId}:${type}`;
+        if (w.ppe[type]?.state !== 'missing') {
+          this.streaks.delete(key);
+          continue;
+        }
+        const s = this.streaks.get(key) ?? { frames: 0, since: now, lastSeen: now, reported: false };
+        s.frames++;
+        s.lastSeen = now;
+        this.streaks.set(key, s);
+        const seconds = (now - s.since) / 1000;
+        const progress = Math.min(1, s.frames / this.settings.confirmationFrames, seconds / this.settings.violationSeconds);
+        if (progress < 1) {
+          status.pending[type] = progress;
+          continue;
+        }
+        status.confirmed.push(type);
+        if (s.reported) continue;
+        s.reported = true; // never re-report this continuing violation
+        const last = this.lastReported.get(type);
+        if (last !== undefined && now - last < this.settings.incidentCooldownSeconds * 1000) continue;
+        this.lastReported.set(type, now);
+        events.push({ type, trackId, person: w.person, frames: s.frames, seconds, since: s.since });
+      }
+      return status;
+    });
+
+    // Workers who left the frame (not seen for a while): forget their streaks.
+    for (const [key, s] of this.streaks) if (now - s.lastSeen > STREAK_GRACE_MS) this.streaks.delete(key);
+    return { workers: statuses, events };
+  }
+}
+
+/** Which required items the loaded model can actually detect. */
+export function supportedPpe(modelClasses: readonly string[]): PpeType[] {
+  return PPE_TYPES.filter((t) => modelClasses.includes(t));
+}
