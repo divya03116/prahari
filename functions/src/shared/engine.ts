@@ -1,0 +1,721 @@
+/**
+ * PRAHARI SIF-POTENTIAL ENGINE — CANONICAL SOURCE
+ *
+ * `npm run sync` copies this file verbatim to src/shared/engine.ts so the
+ * browser preview and the stored assessment are literally the same bytes.
+ * Edit this file; never the copy.
+ *
+ * WHAT THIS DOES NOT DO
+ * ---------------------
+ * It does not predict fatalities. It answers a counterfactual: given the
+ * energy present, the barriers that failed and the people exposed, what could
+ * this event have become? The reported outcome is deliberately NOT an input to
+ * the score. A zero-injury near miss and a fatality can share a precursor, and
+ * the whole product exists because conventional registers sort by the outcome.
+ *
+ * REPLACING THIS WITH A REAL MODEL
+ * --------------------------------
+ * `analyse()` is the seam. A learned model (MuRIL / IndicBERT fine-tuned for
+ * span extraction) replaces the matcher inside `extract()` and returns the same
+ * shape: energy, barrier, exposure, aggravators, evidence spans. The scoring
+ * arithmetic, the rule net and the tiering stay exactly as they are — the
+ * weights become learned rather than authored. Nothing downstream changes.
+ */
+
+export const ENGINE_VERSION = '2.0.0';
+export const MODEL_VERSION = 'prahari-deterministic-2.0.0';
+
+/* ------------------------------------------------------------------ *
+ * TYPES
+ * ------------------------------------------------------------------ */
+
+export type Tier = 1 | 2 | 3;
+
+export interface VocabEntry {
+  id: string;
+  label: string;
+  short?: string;
+  detail?: string;
+  weight?: number;
+  outcomes?: string[];
+  control?: string;
+  restore?: string;
+  rx: RegExp;
+  rx2?: RegExp;
+}
+
+export type SpanKind = 'energy' | 'barrier' | 'exposure' | 'aggravator' | 'mitigator';
+
+export interface EvidenceSpan {
+  start: number;
+  end: number;
+  kind: SpanKind;
+  id: string;
+}
+
+export interface Hit {
+  id: string;
+  label: string;
+  short: string;
+  detail: string;
+  weight: number;
+  terms: string[];
+}
+
+export type ContributionKind =
+  | 'base'
+  | 'energy'
+  | 'barrier'
+  | 'exposure'
+  | 'aggravator'
+  | 'mitigator'
+  | 'rule';
+
+export interface Contribution {
+  key: string;
+  label: string;
+  amount: number;
+  kind: ContributionKind;
+}
+
+export interface RuleDef {
+  code: string;
+  title: string;
+  ref: string;
+}
+
+export interface RuleHit extends RuleDef {
+  evidence: string;
+}
+
+export interface LanguageInfo {
+  primary: string;
+  scripts: string[];
+  codeMixed: boolean;
+}
+
+export interface Flag {
+  id: string;
+  label: string;
+}
+
+export interface Assessment {
+  score: number;
+  preRuleScore: number;
+  tier: Tier;
+  tierLabel: string;
+  responseWindow: string;
+  escalated: boolean;
+  noInjury: boolean;
+  energy: Hit[];
+  barrier: Hit[];
+  exposure: Hit[];
+  aggravators: Flag[];
+  mitigators: Flag[];
+  contributions: Contribution[];
+  rulesTriggered: RuleHit[];
+  potentialOutcomes: string[];
+  evidence: EvidenceSpan[];
+  language: LanguageInfo;
+  engineVersion: string;
+  modelVersion: string;
+}
+
+export interface CapaStep {
+  control: string;
+  rationale: string;
+  owner: string;
+  dueInDays: number;
+}
+
+interface Match {
+  start: number;
+  end: number;
+  term: string;
+}
+
+const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
+
+/* ------------------------------------------------------------------ *
+ * WEIGHT CEILINGS — the shape of the score
+ *
+ * Energy and barrier dominate because together they describe whether harm
+ * was possible at all. Exposure decides whether it would have reached a
+ * person. Context can only nudge: a report cannot be argued into Tier 1 by
+ * adjectives alone.
+ * ------------------------------------------------------------------ */
+export const WEIGHTS = {
+  base: 2,
+  energyMax: 30,
+  barrierMax: 30,
+  secondBarrier: 4, // two independent controls missing is worse than one
+  exposureMax: 25,
+  aggravatorEach: 5,
+  aggravatorMax: 10,
+  mitigatorEach: 3,
+  mitigatorMax: 9,
+  ruleFloor: 70, // the deterministic net cannot go below Tier 1
+};
+
+export const TIER_BREAKS = { tier1: 70, tier2: 40 };
+
+/* ------------------------------------------------------------------ *
+ * MULTILINGUAL MATCHING
+ *
+ * `rx` is Latin script and word-bounded with \b. `rx2` carries Devanagari
+ * and Bengali/Assamese script and MUST NOT use \b — JavaScript's word
+ * boundary is defined over [A-Za-z0-9_], so it never fires before a
+ * non-ASCII code point and /\bগ্যাস/ can never match. Romanised field
+ * speech ("nahi tha", "hua", "dheela", "akele") is Latin, so it lives in
+ * `rx` alongside English.
+ *
+ * Field reports are code-mixed by default. "Gas leak hua, isolation proper
+ * nahi tha" is not broken English to be corrected — it is the language the
+ * report is actually written in.
+ * ------------------------------------------------------------------ */
+
+export const ENERGY: VocabEntry[] = [
+  {
+    id: 'chemical',
+    label: 'Chemical / toxic atmosphere',
+    short: 'Chemical',
+    weight: 30,
+    outcomes: ['Asphyxiation or acute toxic exposure', 'Loss of consciousness inside the space'],
+    control: 'Evacuate, ventilate and re-test the atmosphere before any re-entry.',
+    rx: /\b(h2s|hydrogen sulphide|sour gas|toxic|toxic atmosphere|asphyxiat\w*|oxygen deficien\w*|fumes|vapour|vapor|acid|solvent|corrosive|condensate|methanol|chemical|confined space|manhole|sump)\b/gi,
+    rx2: /(বিষাক্ত|ৰাসায়নিক|রাসায়নিক|গ্যাছ|গ্যাস|জহৰীয়া|जहरीली|रसायन|तेजाब|दमघोंटू|विषैली)/g,
+  },
+  {
+    id: 'pressure',
+    label: 'Pressure / hydrocarbon release',
+    short: 'Pressure',
+    weight: 30,
+    outcomes: ['Fire or explosion following ignition', 'Uncontrolled release and jet fire'],
+    control: 'Depressurise, isolate and prove zero energy before anyone approaches.',
+    // Real reports say "residual pressure", "gas detected", "still charged" and
+    // "line live" far more often than "gas leak". Matching only the tidy phrases
+    // meant a hydrocarbon release could register as no energy at all.
+    rx: /\b(bop|blow ?out|well ?head|flange|gas leak|gas release|gas detect\w*|hydrocarbon|leak\w*|pressure|residual pressure|trapped pressure|under pressure|still charged|line live|live line|kick|choke|hydraulic|pneumatic|pressuris\w*|pressuriz\w*|high[- ]pressure|kill line|psi|bar\b|nitrogen|air receiver|pig launcher|spool)\b/gi,
+    rx2: /(চাপ|উচ্চ চাপ|গেছ লিক|গ্যাস লিক|লিক|दबाव|गैस रिसाव|गैस लीक|प्रेशर|रिसाव)/g,
+  },
+  {
+    id: 'gravity',
+    label: 'Gravity / stored height',
+    short: 'Gravity',
+    weight: 28,
+    outcomes: ['Fall from height', 'Struck by a dropped or swinging load'],
+    control: 'Land the load, barricade the drop zone and restore fall protection.',
+    // "the load", "the lift", "rigging" carry stored height in oilfield usage
+    // even without the word "suspended" in front of them. Missing them scored a
+    // rigger standing under a load as routine, which is the exact failure this
+    // engine exists to prevent.
+    rx: /\b(suspended|suspended load|the load|a load|lifting|lift\b|rigging|rigger|wireline|slickline|coiled tubing|tripping|tripped (?:in|out)|elevator|hoist\w*|crane|sling|derrick|mast|monkey board|scaffold\w*|ladder|working at height|work at height|overhead|floor opening|grating|falling|fell|dropped object|\d+(?:\.\d+)?\s*(?:m|metres?|meters?)\s*(?:height|high|above))\b/gi,
+    rx2: /(উচ্চতা|ওখ|ঝুলন্ত|ওলমি|পৰি|পড়ে|ভারা|উপর|ऊंचाई|ऊँचाई|लटक|गिर|सीढ़ी|मचान|ऊपर)/g,
+  },
+  {
+    id: 'electrical',
+    label: 'Electrical energy',
+    short: 'Electrical',
+    weight: 28,
+    outcomes: ['Electrocution', 'Arc flash burns'],
+    control: 'Lock out, tag out and prove dead before the enclosure is opened.',
+    rx: /\b(electrical|electricity|live wire|live cable|live equipment|energised|energized|440\s*v|415\s*v|11\s*kv|switch ?gear|earthing|earth\b|electric shock|transformer|busbar|panel)\b/gi,
+    rx2: /(বিদ্যুৎ|বিজুলী|কাৰেন্ট|কারেন্ট|তাঁৰ|तार|बिजली|करंट|विद्युत|झटका)/g,
+  },
+  {
+    id: 'mechanical',
+    label: 'Mechanical / rotating equipment',
+    short: 'Mechanical',
+    weight: 25,
+    outcomes: ['Entanglement or amputation', 'Crush injury at a pinch point'],
+    control: 'Stop the drive, refit the guard and prove it cannot be restarted.',
+    rx: /\b(rotating|draw ?works|tongs|drill string|drill pipe|top drive|conveyor|fork ?lift|reversing|pinch point|coupling|moving machinery|winch|shaft|belt drive|gear)\b/gi,
+    rx2: /(ঘূর্ণ|ঘূৰ্ণ|মেশিন|মেচিন|যন্ত্র|मशीन|घूम|चलती मशीन|पुर्जा)/g,
+  },
+  {
+    id: 'thermal',
+    label: 'Thermal / ignition source',
+    short: 'Thermal',
+    weight: 24,
+    outcomes: ['Burns', 'Ignition of a flammable atmosphere'],
+    control: 'Stop hot work and withdraw every ignition source from the area.',
+    rx: /\b(hot work|welding|weld\w*|gas cutting|cutting torch|grinding|grinder|flare|steam|furnace|naked flame|spark\w*|hot surface)\b/gi,
+    rx2: /(ঝালাই|ৱেল্ডিং|আগুন|জুই|গৰম|গরম|वेल्डिंग|आग|गर्म|चिंगारी|कटिंग)/g,
+  },
+];
+
+export const BARRIER: VocabEntry[] = [
+  {
+    id: 'defeated',
+    label: 'Defeated',
+    detail: 'A control was present and was deliberately overridden.',
+    weight: 30,
+    restore: 'Reinstate the control that was bypassed and prove it functions before work restarts.',
+    // A protective system parked in manual, inhibited, or never restored to
+    // auto is a control that exists and has been switched off — the same class
+    // of failure as a bypassed interlock, and just as invisible in a register
+    // that only reads the word "bypass".
+    rx: /\b(by ?pass\w*|override|overridden|jumper\w*|defeated|disabled|tampered|inhibited|in manual|manual mode|left in manual|not restored to auto|(?:guard|cover|interlock|barricade|trip)s?\s+(?:(?:had|has|was|were|been|is|are)\s+)*removed|removed\s+(?:the\s+)?(?:guard|cover|interlock)|interlock\s+(?:off|open|bypassed)|blanked|forced open|found (?:in the )?open(?: position)?|left open|supposedly applied)\b/gi,
+    rx2: /(বাইপাস|বাইপাচ|নিষ্ক্রিয়|আঁতৰোৱা|খুলে|বন্ধ কৰি|बायपास|निष्क्रिय|हटा दिया|बंद कर|खोल दिया)/g,
+  },
+  {
+    id: 'absent',
+    label: 'Absent',
+    detail: 'A required control was never in place.',
+    weight: 26,
+    restore: 'Put the missing control in place and re-authorise the work under permit.',
+    rx: /\b(no permit|without (?:a )?permit|no barricade|without (?:a )?harness|no harness|no gas test\w*|without gas test\w*|not\s+(?:(?:been|being)\s+)?isolated|no isolation|without isolation|no earthing|not calibrated|no standby|without standby|no supervision|no toolbox|no watch|no (?:combined )?jsa|without (?:a )?jsa|no risk assessment|no method statement|no ptw|isolation\s+(?:(?:had|has|was|were|been|is)\s+)*not\s+(?:been\s+)?(?:proven|verified|confirmed|checked|applied)|not\s+(?:been\s+)?(?:proven|verified)|before the isolation was verified|(?:blind|blank)\s+(?:was\s+)?not\s+fitted|not signed back|missing|absent|unavailable|was not (?:present|done|carried out)|were not (?:present|done)|not (?:present|done|carried out)|(?:toolbox talk|briefing|permit|gas test|isolation|inspection)\s+(?:was\s+)?(?:skipped|omitted|not (?:done|held))|nahi tha|nahi thi|nahin tha|bina|nai chhilo|nasil)\b/gi,
+    rx2: /(অবিহনে|নথকা|নাছিল|ছিল না|নাই|অনুমতি নাই|বিনা|নহোৱাকৈ|बिना|नहीं था|नहीं थी|नहीं किया|अनुमति नहीं|मौजूद नहीं)/g,
+  },
+  {
+    id: 'degraded',
+    label: 'Degraded',
+    detail: 'A control was present but not functioning as intended.',
+    weight: 16,
+    restore: 'Quarantine the defective equipment and replace it before the next shift.',
+    rx: /\b(loose|damaged|worn out|worn|broken|expired|faulty|leaking|cracked|corroded|defective|not working|malfunction\w*|jammed|frayed|improper\w*|not proper|proper nahi|dheela|kharap|khrab)\b/gi,
+    rx2: /(ঢিলা|আলগা|ভাঙা|ভঙা|নষ্ট|বেয়া|মেয়াদ উত্তীৰ্ণ|ढीला|टूटा|खराब|जंग|सही नहीं)/g,
+  },
+];
+
+export const EXPOSURE: VocabEntry[] = [
+  {
+    id: 'line-of-fire',
+    label: 'Line of fire',
+    detail: 'A person was in the path the energy would have taken.',
+    weight: 25,
+    // Directly behind a reversing vehicle is the path the energy takes, not
+    // adjacency — the same reason "under a suspended load" is line of fire.
+    rx: /\b(under|underneath|below|beneath|line of fire|standing under|working under|entered|inside the|inside a|within the|straddling|in between|directly above|(?:close|directly|right|walking|standing) behind|niche|andar)\b/gi,
+    rx2: /(তলত|নিচে|নীচে|ভিতৰত|ভিতরে|ভিতৰলৈ|नीचे|अंदर|के नीचे|भीतर|बीच में)/g,
+  },
+  {
+    id: 'proximity',
+    label: 'Proximity',
+    detail: 'A person was close enough to be reached by an escalation.',
+    weight: 12,
+    // Person nouns must be plural-tolerant. "a technician was working" matched
+    // while "two technicians were standing" did not, so reports describing MORE
+    // people exposed scored LOWER than reports describing one.
+    rx: /\b(near|nearby|beside|adjacent|close to|alongside|around|standing at|\d+(?:\.\d+)?\s*(?:m|metres?|meters?)\s*away|technicians?|operators?|helpers?|workers?|crew|fitters?|riggers?|roustabouts?|slingers?|banksmen|welders?|personnel|staff|men|log\b|aas ?paas)\b/gi,
+    rx2: /(ওচৰত|কাছে|পাশে|কৰ্মী|কর্মী|শ্ৰমিক|শ্রমিক|লোক|पास|नजदीक|आसपास|मजदूर|कर्मचारी|लोग)/g,
+  },
+];
+
+export const AGGRAVATORS: VocabEntry[] = [
+  {
+    id: 'alone',
+    label: 'No standby / working alone',
+    rx: /\b(no standby|without standby|working alone|alone|lone worker|by himself|by herself|unattended|no watch|akele|akela)\b/gi,
+    rx2: /(অকলে|একা|अकेला|अकेले)/g,
+  },
+  {
+    id: 'night',
+    label: 'Night shift',
+    rx: /\b(night shift|at night|night ?time|raat|raat ko)\b/gi,
+    rx2: /(ৰাতি|রাতে|রাত্রি|रात|रात को)/g,
+  },
+  {
+    id: 'contract',
+    label: 'Contract crew',
+    rx: /\b(contract(?:or|ors|ual)?(?:\s+(?:crew|staff|labour|labor|worker|workers|hands))?|sub ?contractor|thekedar)\b/gi,
+    rx2: /(ঠিকাদাৰ|ঠিকাদার|ठेकेदार|ठेका)/g,
+  },
+  {
+    id: 'weather',
+    label: 'Adverse weather',
+    rx: /\b(rain\w*|storm|wind[y]?|monsoon|fog\w*|slippery|wet|barish)\b/gi,
+    rx2: /(বৰষুণ|বৃষ্টি|ধুমুহা|ঝড়|बारिश|तूफान|कुहरा|फिसलन)/g,
+  },
+  {
+    id: 'unfamiliar',
+    label: 'Unfamiliar or untrained task',
+    rx: /\b(first time|new to the job|unfamiliar|not trained|untrained|no experience|inexperienced|no induction)\b/gi,
+    rx2: /(প্ৰশিক্ষণ নাই|প্রশিক্ষণ ছিল না|নতুন|प्रशिक्षण नहीं|नया|अनुभव नहीं)/g,
+  },
+];
+
+/* Mitigators describe controls that genuinely were working. They can lower a
+ * score, but never below the rule-net floor, and never on a report that has a
+ * live energy source and a failed barrier. */
+export const MITIGATORS: VocabEntry[] = [
+  {
+    id: 'controlled',
+    label: 'Work was authorised and controlled',
+    rx: /\b(permit was (?:in place|valid|obtained)|valid permit|under permit|isolation (?:was )?(?:verified|confirmed|in place)|gas test (?:was )?(?:done|carried out|completed)|standby (?:was )?present|toolbox talk (?:was )?(?:held|done)|supervisor present|barricad\w+ (?:was )?in place)\b/gi,
+    rx2: /(অনুমতি আছিল|अनुमति थी|परमिट था)/g,
+  },
+  {
+    id: 'housekeeping',
+    label: 'Housekeeping / no stored energy',
+    rx: /\b(house ?keeping|litter|stationery|office|cleaning|dust|tidy|garden|paperwork|signage)\b/gi,
+    rx2: /(পৰিষ্কাৰ|পরিষ্কার|আবর্জনা|সাফাই|सफाई|कचरा|कूड़ा)/g,
+  },
+];
+
+/* IOGP Life-Saving Rule families. Titles are the published rule names; no
+ * clause numbers are invented here, and OISD references are left as explicit
+ * placeholders until the real clause data is supplied. */
+export const LIFE_SAVING_RULES: RuleDef[] = [
+  { code: 'LSR-01', title: 'Bypassing safety controls', ref: 'IOGP LSR · OISD ref. pending' },
+  { code: 'LSR-02', title: 'Confined space', ref: 'IOGP LSR · OISD ref. pending' },
+  { code: 'LSR-03', title: 'Energy isolation', ref: 'IOGP LSR · OISD ref. pending' },
+  { code: 'LSR-04', title: 'Work authorisation', ref: 'IOGP LSR · OISD ref. pending' },
+  { code: 'LSR-05', title: 'Hot work', ref: 'IOGP LSR · OISD ref. pending' },
+  { code: 'LSR-06', title: 'Line of fire', ref: 'IOGP LSR · OISD ref. pending' },
+  { code: 'LSR-07', title: 'Safe mechanical lifting', ref: 'IOGP LSR · OISD ref. pending' },
+  { code: 'LSR-08', title: 'Work at height', ref: 'IOGP LSR · OISD ref. pending' },
+];
+
+const NO_INJURY: Pick<VocabEntry, 'rx' | 'rx2'> = {
+  rx: /\b(no injury|no injuries|nobody was (?:hurt|injured)|no one was (?:hurt|injured)|none injured|uninjured|escaped injury|without injury|no harm|near miss|koi chot nahi)\b/gi,
+  rx2: /(আঘাত পোৱা নাই|কেউ আহত হয়নি|আঘাত লগা নাই|चोट नहीं|कोई घायल नहीं)/g,
+};
+
+/* ------------------------------------------------------------------ *
+ * MATCHING
+ * ------------------------------------------------------------------ */
+
+function collect(text: string, rx?: RegExp): Match[] {
+  if (!rx) return [];
+  const out: Match[] = [];
+  // String.prototype.matchAll clones the regex, so the shared /g literals
+  // above never carry lastIndex between calls.
+  for (const m of text.matchAll(rx)) {
+    if (typeof m.index !== 'number' || !m[0]) continue;
+    out.push({ start: m.index, end: m.index + m[0].length, term: m[0] });
+  }
+  return out;
+}
+
+const hitsFor = (text: string, entry: Pick<VocabEntry, 'rx' | 'rx2'>): Match[] => [...collect(text, entry.rx), ...collect(text, entry.rx2)];
+
+function scanTable(
+  text: string,
+  table: VocabEntry[],
+  kind: SpanKind,
+): { found: Hit[]; spans: EvidenceSpan[] } {
+  const found: Hit[] = [];
+  const spans: EvidenceSpan[] = [];
+  for (const entry of table) {
+    const ms = hitsFor(text, entry);
+    if (!ms.length) continue;
+    found.push({
+      id: entry.id,
+      label: entry.label,
+      short: entry.short || entry.label,
+      detail: entry.detail || '',
+      weight: entry.weight ?? 0,
+      terms: [...new Set(ms.map((m) => m.term.toLowerCase()))].slice(0, 6),
+    });
+    ms.forEach((m) => spans.push({ start: m.start, end: m.end, kind, id: entry.id }));
+  }
+  found.sort((a, b) => b.weight - a.weight);
+  return { found, spans };
+}
+
+/**
+ * Non-overlapping, sorted evidence spans. Sorted by start, then longest first,
+ * then kept greedily. The UI walks these rather than re-matching the text, so
+ * what was scored and what an officer is shown cannot drift apart.
+ */
+function resolveSpans(spans: EvidenceSpan[]): EvidenceSpan[] {
+  const sorted = [...spans].sort(
+    (a, b) => a.start - b.start || b.end - b.start - (a.end - a.start),
+  );
+  const kept: EvidenceSpan[] = [];
+  let cursor = -1;
+  for (const s of sorted) {
+    if (s.start < cursor) continue;
+    kept.push(s);
+    cursor = s.end;
+  }
+  return kept;
+}
+
+/* ------------------------------------------------------------------ *
+ * LANGUAGE
+ * ------------------------------------------------------------------ */
+
+/** Script detection, not translation — it tells the UI what it is looking at. */
+export function detectLanguage(text: string): LanguageInfo {
+  const t = String(text || '');
+  // U+0964 danda and U+0965 double danda sit in the Devanagari block but are
+  // shared punctuation: Assamese and Bengali end sentences with them too.
+  // Counting them as Devanagari made a pure Assamese report — which contains
+  // zero Latin characters — come back as "Hindi" on the strength of its full
+  // stops alone. Exclude them from the script vote.
+  const deva = (t.match(/[ऀ-ॣ०-ॿ]/g) || []).length;
+  const beng = (t.match(/[ঀ-৿]/g) || []).length;
+  const latin = (t.match(/[A-Za-z]/g) || []).length;
+  const romanHindi =
+    /\b(hua|nahi|nahin|tha|thi|kaam|karte|karta|log|paas|andar|bina|ke|se|par|mein|raat|akele)\b/i.test(
+      t,
+    );
+
+  const scripts: string[] = [];
+  if (latin) scripts.push('Latin');
+  if (deva) scripts.push('Devanagari');
+  if (beng) scripts.push('Bengali / Assamese');
+
+  let primary = 'English';
+  if (deva > latin) primary = 'Hindi';
+  else if (beng > latin) primary = 'Assamese / Bengali';
+  else if (romanHindi && latin) primary = 'Hindi (romanised)';
+
+  const codeMixed = scripts.length > 1 || (romanHindi && latin > 0 && primary !== 'English');
+  return { primary, scripts, codeMixed };
+}
+
+/* ------------------------------------------------------------------ *
+ * ANALYSE
+ * ------------------------------------------------------------------ */
+
+export function analyse(input: string): Assessment {
+  const text = String(input || '');
+
+  const energy = scanTable(text, ENERGY, 'energy');
+  const barrier = scanTable(text, BARRIER, 'barrier');
+  const exposure = scanTable(text, EXPOSURE, 'exposure');
+
+  const spans = [...energy.spans, ...barrier.spans, ...exposure.spans];
+  const contributions: Contribution[] = [];
+  let score = WEIGHTS.base;
+  contributions.push({ key: 'base', label: 'Baseline potential', amount: WEIGHTS.base, kind: 'base' });
+
+  const topEnergy = energy.found[0] || null;
+  if (topEnergy) {
+    score += topEnergy.weight;
+    contributions.push({
+      key: 'energy',
+      label: `Energy — ${topEnergy.short.toLowerCase()}`,
+      amount: topEnergy.weight,
+      kind: 'energy',
+    });
+  }
+
+  const topBarrier = barrier.found[0] || null;
+  if (topBarrier) {
+    let b = topBarrier.weight;
+    // Two independent controls missing is a systemic failure, not a lapse —
+    // whether they fall in different categories ("bypassed" plus "expired") or
+    // the same one ("no gas test" plus "no standby"). Both are two things that
+    // should have stopped it and did not.
+    const multipleFailures = barrier.found.length > 1 || (topBarrier.terms?.length ?? 0) > 1;
+    if (multipleFailures) b = Math.min(WEIGHTS.barrierMax, b + WEIGHTS.secondBarrier);
+    score += b;
+    contributions.push({
+      key: 'barrier',
+      label: multipleFailures
+        ? `Barrier — ${topBarrier.label.toLowerCase()} (multiple failures)`
+        : `Barrier — ${topBarrier.label.toLowerCase()}`,
+      amount: b,
+      kind: 'barrier',
+    });
+  }
+
+  const topExposure = exposure.found[0] || null;
+  if (topExposure) {
+    score += topExposure.weight;
+    contributions.push({
+      key: 'exposure',
+      label: `Exposure — ${topExposure.label.toLowerCase()}`,
+      amount: topExposure.weight,
+      kind: 'exposure',
+    });
+  }
+
+  const aggravators: Flag[] = [];
+  for (const a of AGGRAVATORS) {
+    const ms = hitsFor(text, a);
+    if (!ms.length) continue;
+    aggravators.push({ id: a.id, label: a.label });
+    ms.forEach((m) => spans.push({ start: m.start, end: m.end, kind: 'aggravator', id: a.id }));
+  }
+  if (aggravators.length) {
+    const amt = Math.min(WEIGHTS.aggravatorMax, aggravators.length * WEIGHTS.aggravatorEach);
+    score += amt;
+    contributions.push({ key: 'aggravators', label: 'Aggravating context', amount: amt, kind: 'aggravator' });
+  }
+
+  // A mitigator only counts where there is no live energy-plus-failed-barrier
+  // combination. "Good housekeeping" next to an open hydrocarbon path is not a
+  // mitigating factor.
+  const mitigators: Flag[] = [];
+  const hazardLive = Boolean(topEnergy && topBarrier);
+  for (const m of MITIGATORS) {
+    const ms = hitsFor(text, m);
+    if (!ms.length) continue;
+    mitigators.push({ id: m.id, label: m.label });
+    ms.forEach((x) => spans.push({ start: x.start, end: x.end, kind: 'mitigator', id: m.id }));
+  }
+  if (mitigators.length && !hazardLive) {
+    const amt = Math.min(WEIGHTS.mitigatorMax, mitigators.length * WEIGHTS.mitigatorEach);
+    score -= amt;
+    contributions.push({ key: 'mitigators', label: 'Mitigating controls in place', amount: -amt, kind: 'mitigator' });
+  }
+
+  /* ---- deterministic rule net ---- */
+  const ids = {
+    energy: energy.found.map((e) => e.id),
+    barrier: barrier.found.map((b) => b.id),
+    exposure: exposure.found.map((e) => e.id),
+  };
+  const has = (rx: RegExp): boolean => rx.test(text);
+  const rulesTriggered: RuleHit[] = [];
+  const fire = (code: string, evidence: string): void => {
+    const rule = LIFE_SAVING_RULES.find((r) => r.code === code);
+    if (rule && !rulesTriggered.some((r) => r.code === code))
+      rulesTriggered.push({ ...rule, evidence });
+  };
+
+  if (ids.barrier.includes('defeated')) fire('LSR-01', 'A safety control was bypassed or removed.');
+  if (has(/\b(confined space|manhole|inside the (?:tank|vessel|pit|sump))\b/i))
+    fire('LSR-02', 'Confined space entry.');
+  if (has(/\b(not\s+(?:been\s+)?isolated|no isolation|without isolation|no earthing|live (?:wire|cable|equipment))\b/i))
+    fire('LSR-03', 'Energy was not isolated.');
+  if (has(/\b(no permit|without (?:a )?permit|permit was not)\b/i))
+    fire('LSR-04', 'Work proceeded without authorisation.');
+  if (ids.energy.includes('thermal') && (ids.energy.includes('pressure') || ids.energy.includes('chemical')))
+    fire('LSR-05', 'Ignition source present with a flammable release.');
+  if (ids.exposure.includes('line-of-fire')) fire('LSR-06', 'A person was in the line of fire.');
+  if (ids.energy.includes('gravity') && has(/\b(suspended|crane|hoist|sling|load|elevator)\b/i))
+    fire('LSR-07', 'Personnel exposed to a suspended load.');
+  if (has(/\b(without (?:a )?harness|no harness|scaffold|ladder|working at height)\b/i))
+    fire('LSR-08', 'Work at height without fall protection.');
+
+  /* THE SAFETY NET IS A FLOOR. It can only ever raise a score.
+   *
+   * The statistical layer may add an alert; it must never be able to hide one.
+   * Implementing this as a multiplier or a soft prior would make suppression
+   * possible in principle, which is precisely what a safety officer cannot be
+   * asked to trust. */
+  const anyExposed = ids.exposure.length > 0;
+  const forceEscalate =
+    rulesTriggered.length > 0 &&
+    Boolean(topEnergy) &&
+    Boolean(topBarrier) &&
+    anyExposed;
+
+  let escalated = false;
+  const preRuleScore = clamp(Math.round(score), 0, 100);
+  if (forceEscalate && score < WEIGHTS.ruleFloor) {
+    contributions.push({
+      key: 'rule-net',
+      label: 'Rule safety-net — forced escalation',
+      amount: WEIGHTS.ruleFloor - Math.round(score),
+      kind: 'rule',
+    });
+    score = WEIGHTS.ruleFloor;
+    escalated = true;
+  }
+
+  const finalScore = clamp(Math.round(score), 0, 100);
+  const tier: Tier = finalScore >= TIER_BREAKS.tier1 ? 1 : finalScore >= TIER_BREAKS.tier2 ? 2 : 3;
+
+  const potentialOutcomes = topEnergy
+    ? (ENERGY.find((e) => e.id === topEnergy.id)?.outcomes ?? [])
+    : [];
+
+  const noInjury = hitsFor(text, NO_INJURY).length > 0;
+
+  return {
+    score: finalScore,
+    preRuleScore,
+    tier,
+    tierLabel: tier === 1 ? 'Critical SIF potential' : tier === 2 ? 'Elevated' : 'Controlled',
+    responseWindow: tier === 1 ? '24 hours' : tier === 2 ? '72 hours' : '7 days',
+    escalated,
+    noInjury,
+    energy: energy.found,
+    barrier: barrier.found,
+    exposure: exposure.found,
+    aggravators,
+    mitigators,
+    contributions,
+    rulesTriggered,
+    potentialOutcomes,
+    evidence: resolveSpans(spans),
+    language: detectLanguage(text),
+    engineVersion: ENGINE_VERSION,
+    modelVersion: MODEL_VERSION,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * CAPA DRAFTING
+ * ------------------------------------------------------------------ */
+
+export function draftCapa(
+  assessment: Assessment,
+  context: { installation?: string } = {},
+): CapaStep[] {
+  const site = context.installation || 'the installation';
+
+  if (assessment.tier === 3 && !assessment.energy.length) {
+    return [
+      {
+        control: 'Log and trend — no immediate corrective action warranted.',
+        rationale: `No stored energy was identified. Record against ${site} and let it feed the precursor trend.`,
+        owner: 'HSE Officer',
+        dueInDays: 14,
+      },
+    ];
+  }
+
+  const steps: CapaStep[] = [];
+  const topEnergy = assessment.energy[0];
+  const topBarrier = assessment.barrier[0];
+
+  steps.push({
+    control: 'Stop the activity and make the area safe.',
+    rationale:
+      (topEnergy && ENERGY.find((e) => e.id === topEnergy.id)?.control) ||
+      `Suspend the activity at ${site} until the reported condition is made safe.`,
+    owner: 'Installation Manager',
+    dueInDays: 1,
+  });
+
+  if (topBarrier) {
+    steps.push({
+      control: 'Restore the failed barrier.',
+      rationale:
+        BARRIER.find((b) => b.id === topBarrier.id)?.restore ??
+        'Restore the failed control and prove it functions before work restarts.',
+      owner: 'Maintenance Supervisor',
+      dueInDays: assessment.tier === 1 ? 3 : 7,
+    });
+  }
+
+  if (assessment.exposure.some((e) => e.id === 'line-of-fire')) {
+    steps.push({
+      control: 'Clear and barricade the line of fire.',
+      rationale:
+        'Define the exposure zone and brief the crew on where they may and may not stand while the task is live.',
+      owner: 'Site Supervisor',
+      dueInDays: 1,
+    });
+  }
+
+  if (assessment.rulesTriggered.length) {
+    steps.push({
+      control: 'Close out the Life-Saving Rule breach.',
+      rationale: `${assessment.rulesTriggered
+        .map((r) => `${r.code} ${r.title}`)
+        .join('; ')}. Review with the responsible supervisor at ${site} and record the outcome against this report.`,
+      owner: 'HSE Officer',
+      dueInDays: assessment.tier === 1 ? 3 : 10,
+    });
+  }
+
+  if (topEnergy && topBarrier) {
+    steps.push({
+      control: 'Search for the same precursor signature across the register.',
+      rationale: `Query the last 90 days for ${topEnergy.short.toLowerCase()} energy combined with ${/^[aeiou]/i.test(topBarrier.label) ? 'an' : 'a'} ${topBarrier.label.toLowerCase()} barrier. A recurring pattern at ${site} is the finding — not this single report.`,
+      owner: 'HSE Officer',
+      dueInDays: 14,
+    });
+  }
+
+  return steps;
+}

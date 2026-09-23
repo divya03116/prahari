@@ -1,0 +1,173 @@
+rules_version = '2';
+
+/**
+ * PRAHARI — Firestore security rules.
+ *
+ * Model: browsers READ; the service layer WRITES.
+ *
+ * Every mutation to reports, actions, reference data, verdicts and roles goes
+ * through a Cloud Function callable that authenticates the caller, checks the
+ * role claim, validates input against the shared schema and writes an audit
+ * entry. Those functions run under the Admin SDK and bypass these rules, so
+ * the only thing these rules must do for those collections is refuse every
+ * direct client write. The one collection a browser writes to is the caller's
+ * own profile, and only three harmless fields of it.
+ *
+ * Roles are read from the Auth custom claim, never from the profile document:
+ * the claim is set only by the Admin SDK, while a document field is data.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ---------------- identity helpers ---------------- */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Email/password accounts must verify their address before reading
+    // anything. Google and Apple vouch for the address; a phone number is
+    // proven by the SMS code (TRUSTED_SIGN_IN_PROVIDERS in shared/constants).
+    function verified() {
+      return signedIn()
+        && (request.auth.token.email_verified == true
+            || request.auth.token.firebase.sign_in_provider in ['google.com', 'apple.com', 'phone']);
+    }
+
+    function role() {
+      return request.auth.token.get('role', 'reviewer');
+    }
+
+    function rank(r) {
+      return r == 'admin' ? 3
+           : r == 'hse-officer' ? 2
+           : r == 'installation-manager' ? 1
+           : 0;
+    }
+
+    function atLeast(r) {
+      return verified() && rank(role()) >= rank(r);
+    }
+
+    /* ---------------- who may see which report ---------------- */
+
+    // HSE officers and administrators see the whole register. An installation
+    // manager sees the reports and actions of the installation assigned to
+    // them. Everyone else sees only what they filed themselves. Rules are not
+    // filters: the app's queries carry the matching reportedBy/installationId
+    // condition for each role.
+    function managedInstallation() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('installationId', null);
+    }
+
+    function canSee(d) {
+      return atLeast('hse-officer')
+        || (verified() && d.get('reportedBy', null) == request.auth.uid)
+        || (verified()
+            && role() == 'installation-manager'
+            && managedInstallation() != null
+            && d.installationId == managedInstallation());
+    }
+
+    /* ---------------- users/{uid} ---------------- */
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || atLeast('admin'));
+
+      // Self-registration creates exactly this shape and nothing else — most
+      // importantly, always at the lowest role and never disabled/enabled by
+      // the client. Promotion happens only through setUserRole.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['email', 'displayName', 'role', 'installationId', 'disabled', 'createdAt', 'lastSeenAt'])
+        && request.resource.data.keys().hasAll(
+             ['email', 'displayName', 'role', 'installationId', 'disabled', 'createdAt', 'lastSeenAt'])
+        && request.resource.data.role == 'reviewer'
+        && request.resource.data.disabled == false
+        && request.resource.data.installationId == null
+        && request.resource.data.email == request.auth.token.get('email', '')
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 80
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.lastSeenAt == request.time;
+
+      // A user may rename themselves and bump lastSeenAt. Nothing else.
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'lastSeenAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 80
+        && (!('lastSeenAt' in request.resource.data.diff(resource.data).affectedKeys())
+            || request.resource.data.lastSeenAt == request.time);
+
+      allow delete: if false;
+    }
+
+    /* ---------------- the register ---------------- */
+
+    // Read: see canSee() above. Writes: submitReport, createPpeIncident,
+    // addStatement, recordVerdict, rescoreReport, archiveReport and the
+    // scoring trigger.
+    match /reports/{reportId} {
+      allow read: if canSee(resource.data);
+      allow write: if false;
+    }
+
+    // Actions carry the report's author (reportedBy) so the same rule applies.
+    match /actions/{actionId} {
+      allow read: if canSee(resource.data);
+      allow write: if false;
+    }
+
+    match /installations/{id} {
+      allow read: if verified();
+      allow write: if false;
+    }
+
+    match /activities/{id} {
+      allow read: if verified();
+      allow write: if false;
+    }
+
+    /* ---------------- roll-ups (written by the trigger) ---------------- */
+
+    // Site-wide totals summarise everyone's reports, so they follow the
+    // whole-register rule. Other people's dashboards are computed from the
+    // reports they can see.
+    match /heat/{id} {
+      allow read: if atLeast('hse-officer');
+      allow write: if false;
+    }
+
+    match /stats/{day} {
+      allow read: if atLeast('hse-officer');
+      allow write: if false;
+    }
+
+    /* ---------------- admin-only ---------------- */
+
+    // Pairs of narrative + human judgement: the supervised training set.
+    match /labels/{id} {
+      allow read: if atLeast('admin');
+      allow write: if false;
+    }
+
+    // Append-only from the server. Nothing may edit or erase the trail.
+    match /auditLogs/{id} {
+      allow read: if atLeast('admin');
+      allow write: if false;
+    }
+
+    // Server bookkeeping; never visible to a client.
+    match /rateLimits/{id} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
