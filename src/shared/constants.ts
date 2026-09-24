@@ -99,7 +99,13 @@ export const COLLECTIONS = {
   rateLimits: 'rateLimits',
 } as const;
 
-export const FUNCTIONS_REGION = 'asia-south1';
+/**
+ * Where the Cloud Functions run. Keep it next to the Firestore database: the
+ * scoring trigger must suit the database location, and every read and write a
+ * function makes goes to the database. prahari-2's database is in nam5 (US),
+ * whose functions region is us-central1.
+ */
+export const FUNCTIONS_REGION = 'us-central1';
 
 /**
  * Sign-in methods whose accounts count as verified without an email link:

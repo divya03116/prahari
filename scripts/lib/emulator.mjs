@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { deflateSync } from 'node:zlib';
 
 export const PROJECT = 'demo-prahari';
-export const REGION = 'asia-south1';
+export const REGION = 'us-central1';
 export const HOSTS = {
   auth: '127.0.0.1:9099',
   firestore: '127.0.0.1:8085',

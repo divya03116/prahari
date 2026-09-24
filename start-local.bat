@@ -51,7 +51,7 @@ if not exist .env (
   >> .env echo VITE_FIREBASE_STORAGE_BUCKET=demo-prahari.appspot.com
   >> .env echo VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000
   >> .env echo VITE_FIREBASE_APP_ID=1:000000000000:web:0000000000000000000000
-  >> .env echo VITE_FUNCTIONS_REGION=asia-south1
+  >> .env echo VITE_FUNCTIONS_REGION=us-central1
   >> .env echo VITE_USE_EMULATORS=true
   >> .env echo VITE_PPE_INFERENCE_URL=http://127.0.0.1:8765
 )

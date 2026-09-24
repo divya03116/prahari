@@ -13,7 +13,7 @@ const CHECKS = [
   [
     'Functions',
     async () => {
-      const r = await fetch('http://127.0.0.1:5001/demo-prahari/asia-south1/submitReport', {
+      const r = await fetch('http://127.0.0.1:5001/demo-prahari/us-central1/submitReport', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{"data":{}}',
