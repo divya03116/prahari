@@ -54,7 +54,7 @@ Configured** — it never shows simulated detections.
    │                                     except the caller's own profile name)
    │  uploads ────────────► Storage    (rules: own folder, JPEG/PNG/WebP/PDF ≤ 10 MB,
    │                                     only before the report is filed)
-   │  writes ─────────────► Cloud Functions callables (asia-south1, Node 22)
+   │  writes ─────────────► Cloud Functions callables (us-central1, Node 22)
    │                          guard() → role claim + verified email + not disabled
    │                          parse() → shared zod schema
    │                          rateLimit() → per-user, per-hour
@@ -189,7 +189,7 @@ claim, disabled check), `parse()` (zod → readable `invalid-argument`), `audit(
 | Authentication | Email/password with verification, Google, Apple and phone-number (SMS code) sign-in, password reset; role in a custom claim |
 | Firestore | Register, actions, reference data, roll-ups, audit log, labels |
 | Storage | Report attachments at `attachments/{uid}/{reportId}/{file}` |
-| Cloud Functions (2nd gen) | Callables, Firestore trigger, scheduled sweep — region `asia-south1` |
+| Cloud Functions (2nd gen) | Callables, Firestore trigger, scheduled sweep — region `us-central1` (next to the nam5 database) |
 | Hosting | SPA with security headers (CSP, frame denial, HSTS, …) |
 
 ---
@@ -286,7 +286,7 @@ Hindi/Assamese/Bengali words work) supports whole-word `array-contains` search.
 | Variable | Meaning |
 |---|---|
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` | Public web-app config from the Firebase console |
-| `VITE_FUNCTIONS_REGION` | Must equal `FUNCTIONS_REGION` (`asia-south1`) |
+| `VITE_FUNCTIONS_REGION` | Must equal `FUNCTIONS_REGION` (`us-central1`) |
 | `VITE_USE_EMULATORS` | `true` to use the local emulator suite |
 | `VITE_PPE_INFERENCE_URL` | Base URL of the PPE inference service (e.g. `http://127.0.0.1:8765`). Empty → monitoring shows *AI Model Not Configured*. In production also add it to `connect-src` in the CSP in `firebase.json` |
 | `VITE_PPE_INFERENCE_TOKEN` | Optional shared secret; must match `PPE_TOKEN` on the service |
@@ -353,6 +353,19 @@ names are generic.
 
 ## 11. Deployment
 
+**The live setup (`prahari-2` + Vercel) — two one-click scripts on Windows:**
+
+| Script | What it does | Needs first |
+|---|---|---|
+| `deploy-backend.bat` | Signs in to Firebase (browser *Allow*), builds and deploys the security rules, the 60 indexes, the storage rules and every Cloud Function to `prahari-2` | Blaze plan; Storage opened once (*Get started*, `us-central1`) |
+| `publish-ai.bat` | Signs in to Hugging Face (paste a Write token), uploads the AI service and models as the public Space `<user>/prahari-ai`, waits until it serves, then points the website at it (Vercel env + rebuild) | a free Hugging Face account |
+| `start-ai.bat` | Runs the AI service on this computer only (until the Space exists) | — |
+
+After `deploy-backend.bat`: sign in on the site with the bootstrap address and open
+`/app/settings?setup=admin` → *Become the first administrator*.
+
+**From scratch, for another project:**
+
 1. Create a Firebase project on the **Blaze** plan (2nd-gen functions and the
    scheduler require it).
 2. Enable **Authentication** → Email/Password, Google, Apple and Phone. Add every
@@ -361,7 +374,7 @@ names are generic.
    not authorised". Apple also needs a Services ID, key and the Firebase
    callback URL registered in your Apple Developer account. Under *Templates*, set
    the action URL to `https://<your-domain>/auth/action`.
-3. Create **Firestore** (Native mode; `asia-south1` recommended) and **Storage**.
+3. Create **Firestore** (Native mode) and **Storage**. `FUNCTIONS_REGION` must suit the database location (`nam5` → `us-central1`, `asia-south1` → `asia-south1`).
 4. `npx firebase use --add <project-id>`; put the project's web config in `.env`
    with `VITE_USE_EMULATORS=false`.
 5. Build and deploy:
