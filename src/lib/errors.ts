@@ -55,6 +55,9 @@ interface CodedError {
   message?: string;
 }
 
+const UNREACHABLE =
+  'The PRAHARI server could not be reached. Check the internet connection; if it keeps happening, the server functions are not deployed yet.';
+
 export function errorMessage(err: unknown, fallback = 'Something went wrong. Try again.'): string {
   if (!err || typeof err !== 'object') return fallback;
   const { code = '', message = '' } = err as CodedError;
@@ -68,7 +71,9 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong. Try
   if (code.startsWith('functions/')) {
     const short = code.slice('functions/'.length);
     // The server's message is written for people; 'internal' is deliberately generic.
-    if (short === 'internal') return fallback;
+    // A bare "internal [0]" comes from the SDK itself: no usable reply at all
+    // (offline, or the server functions are not deployed), so say that instead.
+    if (short === 'internal') return /^internal(?: \[0\])?$/.test(message) ? UNREACHABLE : fallback;
     if (short === 'unavailable') return FIRESTORE.unavailable;
     return message || fallback;
   }
