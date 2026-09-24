@@ -18,3 +18,5 @@ deploy/
 .claude/
 PRAHARI-PROMPT.md
 Ultralytics/
+__pycache__/
+*.pyc
