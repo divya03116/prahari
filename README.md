@@ -387,11 +387,26 @@ names are generic.
    ```
 7. As that admin, add installations and activities under *Reference data*.
 
-The PPE/hazard inference service stays on your own computer: a hosted HTTPS page
-may call `http://127.0.0.1:8765` (it is in the CSP, and the service answers
-Chrome's private-network preflight). Add the site's origin to
-`PPE_ALLOWED_ORIGINS` — `start-local.bat` already includes
-`https://prahari-silk.vercel.app`.
+**The PPE/hazard inference service**, for the hosted site, runs as a Hugging Face
+Space (Docker, CPU) so any device — phones included — can use the models. The
+Space definition is in [`ai/space/`](ai/space/README.md):
+```bash
+python ai/space/stage.py                       # server + weights + metrics → E:/prahari-ml/space-build
+hf auth login                                  # once, with a Write token
+hf upload <user>/prahari-ai E:/prahari-ml/space-build . --repo-type space
+```
+Then set `VITE_PPE_INFERENCE_URL=https://<user>-prahari-ai.hf.space` (in
+`.env.vercel` and the Vercel project's environment) and add the site's origin to
+`PPE_ALLOWED_ORIGINS` in `ai/space/Dockerfile`. `https://*.hf.space` is already in
+the CSP. A free Space sleeps after 48 h without use; the first request wakes it
+(1–2 minutes) and the monitoring page picks it up by itself.
+
+The service can also stay on your own computer: a hosted HTTPS page may call
+`http://127.0.0.1:8765` (it is in the CSP, and the service answers Chrome's
+private-network preflight) — but only on that computer. Double-click
+**`start-ai.bat`** to start just the AI service for the hosted site (Chrome may ask
+once to let the site reach devices on the local network — allow it);
+`start-local.bat` also allows `https://prahari-silk.vercel.app`.
 
 If you use a custom `authDomain`, add it to `frame-src` in the CSP in `firebase.json`.
 
