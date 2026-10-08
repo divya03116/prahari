@@ -301,7 +301,12 @@ the emulator's `functions/.env.local` leaves it empty, so nobody can claim there
 The inference service's own variables are listed in [§12](#12-ai-safety-features).
 
 Test-only: `PLAYWRIGHT_CHANNEL=chrome` (use installed Chrome), `PREVIEW=1` (run E2E
-against the production build).
+against the production build), `PRAHARI_TMP=<folder>` (the browser tests put their
+temporary profiles there instead of the system temp folder — useful when the
+system drive is small; the `.bat` launchers use `E:\prahari-ml\tmp` when it exists).
+
+Packaging: `python scripts/make_zip.py [out.zip]` zips the source without
+packages, build output, caches or any settings/secret file.
 
 ---
 
@@ -579,7 +584,10 @@ starts it automatically when `E:\prahari-ml\venv` exists.
 
 ## 13. Testing
 
-All suites run against the live emulators — no mocks.
+All suites run against the live emulators — no mocks. Before the browser tests,
+`e2e/global-setup.ts` calls every function once: the emulator starts a worker per
+function on first use (up to half a minute on a small machine), and a test should
+time the app, not that cold start.
 
 | Command | What it proves |
 |---|---|

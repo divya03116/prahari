@@ -14,8 +14,17 @@ import { defineConfig, devices } from '@playwright/test';
 const PREVIEW = process.env.PREVIEW === '1';
 const BASE_URL = PREVIEW ? 'http://127.0.0.1:4173' : 'http://127.0.0.1:5173';
 
+// Browser profiles and other temporary files go to PRAHARI_TMP when it is set
+// (e.g. a folder on a data drive), instead of the system temp folder. Set here,
+// before any browser starts, so the test workers and the dev server inherit it.
+if (process.env.PRAHARI_TMP) {
+  process.env.TMP = process.env.TEMP = process.env.PRAHARI_TMP;
+}
+
 export default defineConfig({
   testDir: './e2e',
+  // Warms the emulator's function workers once, so tests do not fail on cold starts.
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,
   retries: 0,

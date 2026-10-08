@@ -9,6 +9,14 @@ setlocal
 title PRAHARI launcher
 cd /d "%~dp0"
 
+rem --- Keep temporary files off the system drive when the work folder exists.
+rem     The server windows started below inherit these.
+if exist "E:\prahari-ml\tmp" (
+  set "TMP=E:\prahari-ml\tmp"
+  set "TEMP=E:\prahari-ml\tmp"
+  set "YOLO_CONFIG_DIR=E:\prahari-ml\tmp\Ultralytics"
+)
+
 where node >nul 2>nul
 if errorlevel 1 (
   echo Node.js 22 or newer is required. Install it from https://nodejs.org and run this again.
