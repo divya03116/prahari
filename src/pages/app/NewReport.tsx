@@ -7,7 +7,7 @@ import { Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/auth/AuthProvider';
-import { AttachmentPicker, type UploadItem } from '@/components/Attachments';
+import { AttachmentPicker, waitingFiles, type UploadItem } from '@/components/Attachments';
 import { VoiceInput } from '@/components/VoiceInput';
 import { EvidenceText, FindingsGrid, RuleNet, ScoreBar } from '@/components/assessment';
 import { TierBadge } from '@/components/ui/badge';
@@ -23,7 +23,7 @@ import { reportTypeKey, shiftKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { firebase } from '@/lib/firebase';
-import { api } from '@/services/callables';
+import { submitOrQueue } from '@/offline/submit';
 import { removeUpload } from '@/services/storage';
 import { COLLECTIONS, LIMITS, REPORT_TYPES, SHIFTS } from '@/shared/constants';
 import { analyse } from '@/shared/engine';
@@ -104,7 +104,7 @@ function LivePreview({ text }: { text: string }) {
   );
 }
 
-export default function NewReport() {
+function NewReportForm({ onQueued }: { onQueued: () => void }) {
   const { user } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -156,8 +156,15 @@ export default function NewReport() {
       const attachments = uploads
         .filter((u) => u.state === 'done')
         .map((u) => ({ path: u.path, name: u.name, size: u.size, contentType: u.contentType }));
-      await api.submitReport({ ...values, reportId, attachments, source: spoken ? 'voice' : 'text' });
+      if (!user) return;
+      // Sent now, or kept on this device until the server can be reached.
+      const outcome = await submitOrQueue(user.uid, { ...values, reportId, attachments, source: spoken ? 'voice' : 'text' }, waitingFiles(uploads));
       submitted.current = true;
+      if (outcome === 'queued') {
+        toast.success(t('offline.saved'), { description: t('offline.savedDesc') });
+        onQueued();
+        return;
+      }
       toast.success(t('new.filed'), { description: t('new.filedDesc') });
       navigate(`/app/reports/${reportId}`, { replace: true });
     } catch (err) {
@@ -294,4 +301,10 @@ export default function NewReport() {
       </div>
     </>
   );
+}
+
+/** Starts a fresh form after a report has been kept on the device (see QuickReport). */
+export default function NewReport() {
+  const [form, setForm] = useState(0);
+  return <NewReportForm key={form} onQueued={() => setForm((n) => n + 1)} />;
 }

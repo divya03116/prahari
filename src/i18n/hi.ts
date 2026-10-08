@@ -621,4 +621,30 @@ export const hi: Record<MessageKey, string> = {
   'pdf.detected': 'पहचान का समय',
   'pdf.disclaimer':
     'केवल निर्णय में सहायता के लिए। स्कोर रिपोर्ट में बताई गई बात से गंभीर चोट की संभावना का अनुमान है; यह भविष्यवाणी नहीं है और सक्षम व्यक्ति के निर्णय की जगह नहीं लेता। रिपोर्ट करने वाले की पहचान इस दस्तावेज़ में नहीं है।',
+
+  // offline and the installed app
+  'offline.banner':
+    'आप ऑफ़लाइन हैं। आप अब भी खतरे की रिपोर्ट कर सकते हैं — वह इस डिवाइस पर सहेजी जाती है और कनेक्शन लौटने पर भेज दी जाती है।',
+  'offline.waiting.one': '{count} रिपोर्ट इस डिवाइस पर सहेजी है, भेजे जाने की प्रतीक्षा में।',
+  'offline.waiting.many': '{count} रिपोर्टें इस डिवाइस पर सहेजी हैं, भेजे जाने की प्रतीक्षा में।',
+  'offline.autoSend': 'कनेक्शन लौटने पर ये अपने आप भेज दी जाती हैं।',
+  'offline.sendNow': 'अभी भेजें',
+  'offline.sent.one': '{count} सहेजी हुई रिपोर्ट भेज दी गई',
+  'offline.sent.many': '{count} सहेजी हुई रिपोर्टें भेज दी गईं',
+  'offline.saved': 'इस डिवाइस पर सहेजी गई',
+  'offline.savedDesc': 'सर्वर से संपर्क नहीं हो सका। कनेक्शन लौटने पर रिपोर्ट अपने आप भेज दी जाएगी।',
+  'offline.refused': 'एक सहेजी हुई रिपोर्ट स्वीकार नहीं हुई',
+  'offline.discard': 'हटाएँ',
+  'offline.discard.title': 'यह सहेजी हुई रिपोर्ट हटाएँ?',
+  'offline.discard.desc': 'यह सर्वर तक नहीं पहुँची है। हटाने पर यह इस डिवाइस से हमेशा के लिए मिट जाएगी।',
+  'attach.queued': '{size} · ऑनलाइन होने पर अपलोड होगी',
+  'pwa.updateReady': 'PRAHARI का नया संस्करण तैयार है।',
+  'settings.app': 'ऐप',
+  'settings.appDescription':
+    'PRAHARI को इस डिवाइस पर इंस्टॉल करें ताकि इसे होम स्क्रीन से खोल सकें और बिना कनेक्शन के भी रिपोर्ट कर सकें।',
+  'settings.install': 'ऐप इंस्टॉल करें',
+  'settings.installed': 'PRAHARI इस डिवाइस पर इंस्टॉल है।',
+  'settings.installIos': 'Safari में Share दबाएँ, फिर “Add to Home Screen” चुनें।',
+  'settings.installOther': 'अपने ब्राउज़र का मेनू खोलें और “Install app” या “Add to Home screen” चुनें।',
+  'settings.installDone': 'PRAHARI इंस्टॉल हो गया',
 };

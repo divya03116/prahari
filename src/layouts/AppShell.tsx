@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { useAuth, useDisplayName } from '@/auth/AuthProvider';
 import { LogoMark } from '@/components/brand';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { OfflineBar } from '@/offline/OfflineBar';
 import { Badge, RoleBadge } from '@/components/ui/badge';
 import { Button, buttonClass } from '@/components/ui/button';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
@@ -227,6 +228,7 @@ export function AppShell() {
       </header>
 
       <main id="main" className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8 print:max-w-none print:p-0">
+        <OfflineBar />
         <Outlet />
       </main>
     </div>

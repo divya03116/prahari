@@ -622,4 +622,30 @@ export const as: Record<MessageKey, string> = {
   'pdf.detected': 'চিনাক্তকৰণৰ সময়',
   'pdf.disclaimer':
     'কেৱল সিদ্ধান্তত সহায়ৰ বাবে। স্ক’ৰে প্ৰতিবেদনত বৰ্ণনা কৰা কথাৰ পৰা গুৰুতৰ আঘাতৰ সম্ভাৱনাৰ অনুমান দিয়ে; ই ভৱিষ্যদ্বাণী নহয় আৰু দক্ষ ব্যক্তিৰ বিচাৰৰ ঠাই নলয়। প্ৰতিবেদন দিয়াজনৰ পৰিচয় এই নথিত নাই।',
+
+  // offline and the installed app
+  'offline.banner':
+    'আপুনি অফলাইন আছে। আপুনি এতিয়াও বিপদৰ প্ৰতিবেদন দিব পাৰে — ই এই ডিভাইচত সংৰক্ষিত হয় আৰু সংযোগ ঘূৰি আহিলে পঠোৱা হয়।',
+  'offline.waiting.one': '{count}টা প্ৰতিবেদন এই ডিভাইচত সংৰক্ষিত, পঠোৱাৰ অপেক্ষাত।',
+  'offline.waiting.many': '{count}টা প্ৰতিবেদন এই ডিভাইচত সংৰক্ষিত, পঠোৱাৰ অপেক্ষাত।',
+  'offline.autoSend': 'সংযোগ ঘূৰি আহিলে এইবোৰ নিজে নিজে পঠোৱা হয়।',
+  'offline.sendNow': 'এতিয়াই পঠাওক',
+  'offline.sent.one': '{count}টা সংৰক্ষিত প্ৰতিবেদন পঠোৱা হ’ল',
+  'offline.sent.many': '{count}টা সংৰক্ষিত প্ৰতিবেদন পঠোৱা হ’ল',
+  'offline.saved': 'এই ডিভাইচত সংৰক্ষিত হ’ল',
+  'offline.savedDesc': 'ছাৰ্ভাৰৰ সৈতে সংযোগ হোৱা নাই। সংযোগ ঘূৰি আহিলে প্ৰতিবেদন নিজে নিজে পঠোৱা হ’ব।',
+  'offline.refused': 'এটা সংৰক্ষিত প্ৰতিবেদন গ্ৰহণ কৰা নহ’ল',
+  'offline.discard': 'বাদ দিয়ক',
+  'offline.discard.title': 'এই সংৰক্ষিত প্ৰতিবেদন বাদ দিবনে?',
+  'offline.discard.desc': 'ই ছাৰ্ভাৰত পোৱা নাই। বাদ দিলে ই এই ডিভাইচৰ পৰা চিৰদিনৰ বাবে আঁতৰি যাব।',
+  'attach.queued': '{size} · অনলাইন হ’লে আপল’ড হ’ব',
+  'pwa.updateReady': 'PRAHARI-ৰ নতুন সংস্কৰণ সাজু।',
+  'settings.app': 'এপ',
+  'settings.appDescription':
+    'PRAHARI এই ডিভাইচত ইনষ্টল কৰক যাতে হ’ম স্ক্ৰীনৰ পৰা খুলিব পাৰে আৰু সংযোগ অবিহনেও প্ৰতিবেদন দিব পাৰে।',
+  'settings.install': 'এপ ইনষ্টল কৰক',
+  'settings.installed': 'PRAHARI এই ডিভাইচত ইনষ্টল আছে।',
+  'settings.installIos': 'Safari-ত Share টিপক, তাৰ পাছত “Add to Home Screen” বাছক।',
+  'settings.installOther': 'আপোনাৰ ব্ৰাউজাৰৰ মেনু খুলি “Install app” বা “Add to Home screen” বাছক।',
+  'settings.installDone': 'PRAHARI ইনষ্টল হ’ল',
 };

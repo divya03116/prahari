@@ -620,4 +620,30 @@ export const bn: Record<MessageKey, string> = {
   'pdf.detected': 'শনাক্তের সময়',
   'pdf.disclaimer':
     'শুধু সিদ্ধান্তে সহায়তার জন্য। স্কোর রিপোর্টে বর্ণিত বিষয় থেকে গুরুতর আঘাতের সম্ভাবনার অনুমান দেয়; এটি পূর্বাভাস নয় এবং দক্ষ ব্যক্তির বিচারের বিকল্প নয়। রিপোর্টকারীর পরিচয় এই নথিতে নেই।',
+
+  // offline and the installed app
+  'offline.banner':
+    'আপনি অফলাইনে আছেন। আপনি এখনো বিপদের রিপোর্ট করতে পারেন — এটি এই ডিভাইসে সংরক্ষিত থাকে এবং সংযোগ ফিরলে পাঠানো হয়।',
+  'offline.waiting.one': '{count}টি রিপোর্ট এই ডিভাইসে সংরক্ষিত, পাঠানোর অপেক্ষায়।',
+  'offline.waiting.many': '{count}টি রিপোর্ট এই ডিভাইসে সংরক্ষিত, পাঠানোর অপেক্ষায়।',
+  'offline.autoSend': 'সংযোগ ফিরলে এগুলো নিজে থেকেই পাঠানো হয়।',
+  'offline.sendNow': 'এখনই পাঠান',
+  'offline.sent.one': '{count}টি সংরক্ষিত রিপোর্ট পাঠানো হয়েছে',
+  'offline.sent.many': '{count}টি সংরক্ষিত রিপোর্ট পাঠানো হয়েছে',
+  'offline.saved': 'এই ডিভাইসে সংরক্ষিত হয়েছে',
+  'offline.savedDesc': 'সার্ভারে পৌঁছানো যায়নি। সংযোগ ফিরলে রিপোর্টটি নিজে থেকেই পাঠানো হবে।',
+  'offline.refused': 'একটি সংরক্ষিত রিপোর্ট গৃহীত হয়নি',
+  'offline.discard': 'বাদ দিন',
+  'offline.discard.title': 'এই সংরক্ষিত রিপোর্ট বাদ দেবেন?',
+  'offline.discard.desc': 'এটি সার্ভারে পৌঁছায়নি। বাদ দিলে এটি এই ডিভাইস থেকে স্থায়ীভাবে মুছে যাবে।',
+  'attach.queued': '{size} · অনলাইনে ফিরলে আপলোড হবে',
+  'pwa.updateReady': 'PRAHARI-এর নতুন সংস্করণ প্রস্তুত।',
+  'settings.app': 'অ্যাপ',
+  'settings.appDescription':
+    'PRAHARI এই ডিভাইসে ইনস্টল করুন, যাতে হোম স্ক্রিন থেকে খুলতে পারেন এবং সংযোগ ছাড়াও রিপোর্ট করতে পারেন।',
+  'settings.install': 'অ্যাপ ইনস্টল করুন',
+  'settings.installed': 'PRAHARI এই ডিভাইসে ইনস্টল আছে।',
+  'settings.installIos': 'Safari-তে Share চাপুন, তারপর “Add to Home Screen” বেছে নিন।',
+  'settings.installOther': 'আপনার ব্রাউজারের মেনু খুলে “Install app” বা “Add to Home screen” বেছে নিন।',
+  'settings.installDone': 'PRAHARI ইনস্টল হয়েছে',
 };

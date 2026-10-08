@@ -23,17 +23,18 @@ import type { z } from 'zod';
 type PpeIncidentPayload = z.input<typeof ppeIncidentSchema>;
 type HazardIncidentPayload = z.input<typeof hazardIncidentSchema>;
 
-async function call<I, O>(name: string, data: I): Promise<O> {
+async function call<I, O>(name: string, data: I, timeout?: number): Promise<O> {
   const [functions, { httpsCallable }] = await Promise.all([getFunctionsLazy(), import('firebase/functions')]);
-  const res = await httpsCallable<I, O>(functions, name)(data);
+  const res = await httpsCallable<I, O>(functions, name, timeout ? { timeout } : undefined)(data);
   return res.data;
 }
 
 type Ok = { ok: true };
 
 export const api = {
-  submitReport: (d: z.input<typeof submitReportSchema>) =>
-    call<z.input<typeof submitReportSchema>, { reportId: string }>('submitReport', d),
+  /** `timeoutMs`: give up waiting sooner than the SDK's 70 s (the outbox takes over; see offline/submit.ts). */
+  submitReport: (d: z.input<typeof submitReportSchema>, timeoutMs?: number) =>
+    call<z.input<typeof submitReportSchema>, { reportId: string }>('submitReport', d, timeoutMs),
   recordVerdict: (d: RecordVerdictInput) => call<RecordVerdictInput, Ok>('recordVerdict', d),
   rescoreReport: (reportId: string) =>
     call<{ reportId: string }, Ok & { score: number; tier: number }>('rescoreReport', { reportId }),

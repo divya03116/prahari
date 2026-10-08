@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 import { useAuth } from '@/auth/AuthProvider';
 import { useReportScope } from '@/auth/scope';
-import { AttachmentPicker, type UploadItem } from '@/components/Attachments';
+import { AttachmentPicker, waitingFiles, type UploadItem } from '@/components/Attachments';
 import { StructuredIncidentPanel } from '@/components/IncidentPanels';
 import { VoiceInput } from '@/components/VoiceInput';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { reportTypeKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { firebase } from '@/lib/firebase';
+import { submitOrQueue } from '@/offline/submit';
 import { detectImage, getModelStatus, modelFor } from '@/ai/inference';
 import { speechSupported } from '@/ai/speech';
 import { api } from '@/services/callables';
@@ -77,7 +78,7 @@ function geoError(err: GeolocationPositionError): string {
  * location, submit. The same service call and scoring as the full form. With
  * ?incident=<id> it adds the account to an existing incident instead.
  */
-export default function QuickReport() {
+function QuickReportForm({ onQueued }: { onQueued: () => void }) {
   const { user, profile } = useAuth();
   const { t } = useI18n();
   const seesAll = useReportScope().kind === 'all';
@@ -208,28 +209,36 @@ export default function QuickReport() {
         navigate(seesAll ? `/app/reports/${attachTo}` : '/app', { replace: true });
         return;
       }
+      if (!user) return;
       const hour = new Date().getHours();
-      await api.submitReport({
+      const report = {
         reportId,
         text: text.trim(),
         installationId,
         type,
-        shift: hour >= 6 && hour < 18 ? 'Day' : 'Night',
+        shift: hour >= 6 && hour < 18 ? ('Day' as const) : ('Night' as const),
         contractor: false,
         attachments: uploads
           .filter((u) => u.state === 'done')
           .map((u) => ({ path: u.path, name: u.name, size: u.size, contentType: u.contentType })),
-        source: aiDrafted ? 'photo' : spoken ? 'voice' : 'text',
+        source: aiDrafted ? ('photo' as const) : spoken ? ('voice' as const) : ('text' as const),
         geo,
         photoCheck:
           aiDrafted && check.state === 'found'
             ? { models: check.models, findings: check.findings.map((f) => ({ type: f.type, confidence: Number(f.confidence.toFixed(4)) })) }
             : null,
-      });
+      };
+      // Sent now, or kept on this device until the server can be reached.
+      const outcome = await submitOrQueue(user.uid, report, waitingFiles(uploads));
       try {
         localStorage.setItem(INSTALLATION_KEY, installationId);
       } catch {
         /* optional */
+      }
+      if (outcome === 'queued') {
+        toast.success(t('offline.saved'), { description: t('offline.savedDesc') });
+        onQueued();
+        return;
       }
       toast.success(t('quick.toast.submitted'), { description: t('quick.toast.scoring') });
       navigate(`/app/reports/${reportId}`, { replace: true });
@@ -465,7 +474,7 @@ export default function QuickReport() {
 
       {structured && !attachTo && <StructuredIncidentPanel structured={structured} preview />}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-canvas/95 p-3 backdrop-blur-sm lg:static lg:border-0 lg:bg-transparent lg:p-0">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-canvas/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm lg:static lg:border-0 lg:bg-transparent lg:p-0">
         <div className="mx-auto max-w-xl">
           <Button variant="primary" size="lg" className="h-12 w-full" loading={busy} disabled={!canSubmit} onClick={() => void submit()}>
             {!busy && <Send aria-hidden />} {attachTo ? t('quick.addToIncident') : t('quick.submit')}
@@ -474,4 +483,14 @@ export default function QuickReport() {
       </div>
     </div>
   );
+}
+
+/**
+ * Starts a fresh form (with its own report id) after a report has been kept on
+ * the device, so the next one can be filed straight away — without leaving a
+ * screen that is known to be loaded, which matters when there is no connection.
+ */
+export default function QuickReport() {
+  const [form, setForm] = useState(0);
+  return <QuickReportForm key={form} onQueued={() => setForm((n) => n + 1)} />;
 }

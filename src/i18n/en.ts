@@ -623,6 +623,32 @@ export const en = {
   'pdf.detected': 'Detected',
   'pdf.disclaimer':
     'Decision support only. The score estimates the potential for serious injury from what the report describes; it is not a prediction and does not replace a competent person’s judgement. The reporter’s identity is not part of this document.',
+
+  // ------------------------------------------------------------------ offline and the installed app
+  'offline.banner':
+    'You are offline. You can still report a hazard — it is saved on this device and sent when the connection returns.',
+  'offline.waiting.one': '{count} report is saved on this device, waiting to be sent.',
+  'offline.waiting.many': '{count} reports are saved on this device, waiting to be sent.',
+  'offline.autoSend': 'They are sent automatically when the connection returns.',
+  'offline.sendNow': 'Send now',
+  'offline.sent.one': '{count} saved report was sent',
+  'offline.sent.many': '{count} saved reports were sent',
+  'offline.saved': 'Saved on this device',
+  'offline.savedDesc': 'The server could not be reached. The report is sent automatically when the connection returns.',
+  'offline.refused': 'A saved report was not accepted',
+  'offline.discard': 'Discard',
+  'offline.discard.title': 'Discard this saved report?',
+  'offline.discard.desc': 'It has not reached the server. Discarding removes it from this device for good.',
+  'attach.queued': '{size} · uploads when you are back online',
+  'pwa.updateReady': 'A new version of PRAHARI is ready.',
+  'settings.app': 'App',
+  'settings.appDescription':
+    'Install PRAHARI on this device to open it from the home screen and keep reporting without a connection.',
+  'settings.install': 'Install app',
+  'settings.installed': 'PRAHARI is installed on this device.',
+  'settings.installIos': 'In Safari, tap Share, then “Add to Home Screen”.',
+  'settings.installOther': 'Open your browser’s menu and choose “Install app” or “Add to Home screen”.',
+  'settings.installDone': 'PRAHARI was installed',
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof en;

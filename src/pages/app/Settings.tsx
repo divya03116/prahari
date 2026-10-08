@@ -13,6 +13,7 @@ import { DataRow, Panel, PanelBody, PanelFooter, PanelHeader } from '@/component
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useReference } from '@/hooks/reference';
 import { useI18n } from '@/i18n';
+import { InstallApp } from '@/pwa/InstallApp';
 import { roleDescriptionKey } from '@/i18n/labels';
 import { errorMessage } from '@/lib/errors';
 import { formatDateTime } from '@/lib/format';
@@ -126,6 +127,13 @@ export default function Settings() {
           <PanelHeader title={t('settings.language')} description={t('settings.languageDescription')} />
           <PanelBody>
             <LanguageSwitcher />
+          </PanelBody>
+        </Panel>
+
+        <Panel>
+          <PanelHeader title={t('settings.app')} description={t('settings.appDescription')} />
+          <PanelBody>
+            <InstallApp />
           </PanelBody>
         </Panel>
 
