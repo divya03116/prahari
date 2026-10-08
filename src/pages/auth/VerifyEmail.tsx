@@ -7,6 +7,7 @@ import { FullPageSpinner } from '@/auth/guards';
 import { useAuth } from '@/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/feedback';
+import { rich, useI18n } from '@/i18n';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { errorMessage } from '@/lib/errors';
 import { usingEmulators } from '@/lib/firebase';
@@ -17,6 +18,7 @@ const COOLDOWN = 60;
 export default function VerifyEmail() {
   const { status, user, verified, refresh, signOut } = useAuth();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [cooldown, setCooldown] = useState(0);
   const [checking, setChecking] = useState(false);
   const [sending, setSending] = useState(false);
@@ -46,7 +48,7 @@ export default function VerifyEmail() {
     try {
       await resendVerification(user);
       setCooldown(COOLDOWN);
-      toast.success('Verification email sent');
+      toast.success(t('auth.verify.emailSent'));
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
@@ -70,10 +72,10 @@ export default function VerifyEmail() {
 
   return (
     <AuthLayout
-      title="Verify your email"
+      title={t('auth.verify.title')}
       footer={
         <button type="button" className="cursor-pointer text-fg-muted hover:text-fg" onClick={() => void signOut()}>
-          Use a different account
+          {t('auth.useDifferentAccount')}
         </button>
       }
     >
@@ -81,21 +83,20 @@ export default function VerifyEmail() {
         <div className="flex gap-3 rounded-md border border-border bg-surface p-4">
           <MailCheck className="mt-0.5 size-5 shrink-0 text-signal" aria-hidden />
           <p className="text-sm text-fg-muted">
-            We sent a verification link to <span className="font-medium text-fg">{user.email}</span>. Open it to activate
-            your account. This page continues on its own once you have.
+            {rich(t('auth.verify.sent'), { email: <span className="font-medium text-fg">{user.email}</span> })}
           </p>
         </div>
-        {notYet && <Alert tone="warning">That address is not verified yet. Check your spam folder, or send the link again.</Alert>}
+        {notYet && <Alert tone="warning">{t('auth.verify.notYet')}</Alert>}
         {usingEmulators && (
-          <Alert tone="info" title="Local emulators">
-            No email is sent. The verification link is printed in the emulators' terminal output.
+          <Alert tone="info" title={t('auth.verify.localTitle')}>
+            {t('auth.verify.localBody')}
           </Alert>
         )}
         <Button variant="primary" size="lg" className="w-full" loading={checking} onClick={check}>
-          I have verified my email
+          {t('auth.verify.done')}
         </Button>
         <Button size="lg" className="w-full" onClick={resend} loading={sending} disabled={cooldown > 0}>
-          {cooldown > 0 ? `Send again in ${cooldown}s` : 'Send the link again'}
+          {cooldown > 0 ? t('auth.verify.sendAgainIn', { seconds: cooldown }) : t('auth.verify.sendAgain')}
         </Button>
       </div>
     </AuthLayout>

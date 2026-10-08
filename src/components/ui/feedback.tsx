@@ -1,14 +1,16 @@
 import type { ReactNode } from 'react';
 import { AlertTriangle, Loader2, RotateCw } from 'lucide-react';
 
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { Button } from './button';
 
-export function Spinner({ className, label = 'Loading' }: { className?: string; label?: string }) {
+export function Spinner({ className, label }: { className?: string; label?: string }) {
+  const { t } = useI18n();
   return (
     <span role="status" className={cn('inline-flex items-center text-fg-subtle', className)}>
       <Loader2 className="size-4 animate-spin" aria-hidden />
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{label ?? t('common.loading')}</span>
     </span>
   );
 }
@@ -26,8 +28,9 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 export function SkeletonRows({ rows = 6, className }: { rows?: number; className?: string }) {
+  const { t } = useI18n();
   return (
-    <div role="status" aria-label="Loading" className={cn('divide-y divide-border', className)}>
+    <div role="status" aria-label={t('common.loading')} className={cn('divide-y divide-border', className)}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-4 px-4 py-3">
           <Skeleton className="h-4 w-16" />
@@ -68,7 +71,7 @@ export function EmptyState({
 }
 
 export function ErrorState({
-  title = 'Could not load this',
+  title,
   message,
   onRetry,
   className,
@@ -78,16 +81,17 @@ export function ErrorState({
   onRetry?: () => void;
   className?: string;
 }) {
+  const { t } = useI18n();
   return (
     <div role="alert" className={cn('flex flex-col items-center justify-center px-6 py-14 text-center', className)}>
       <div className="mb-3 flex size-9 items-center justify-center rounded-md border border-critical-line bg-critical-soft text-critical">
         <AlertTriangle className="size-4" aria-hidden />
       </div>
-      <p className="text-sm font-medium text-fg">{title}</p>
+      <p className="text-sm font-medium text-fg">{title ?? t('common.couldNotLoad')}</p>
       {message && <p className="mt-1 max-w-sm text-sm text-fg-subtle">{message}</p>}
       {onRetry && (
         <Button size="sm" className="mt-4" onClick={onRetry}>
-          <RotateCw aria-hidden /> Try again
+          <RotateCw aria-hidden /> {t('common.tryAgain')}
         </Button>
       )}
     </div>

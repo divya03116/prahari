@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { ChevronDown } from 'lucide-react';
 
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 const control =
@@ -82,10 +83,11 @@ export function Label({
   className?: string;
   optional?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <label htmlFor={htmlFor} className={cn('flex items-baseline gap-1.5 text-sm font-medium text-fg', className)}>
       {children}
-      {optional && <span className="text-xs font-normal text-fg-subtle">Optional</span>}
+      {optional && <span className="text-xs font-normal text-fg-subtle">{t('common.optional')}</span>}
     </label>
   );
 }

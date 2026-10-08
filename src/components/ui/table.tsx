@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { Button } from './button';
 
@@ -79,15 +80,16 @@ export function Pagination({
   loading?: boolean;
   summary?: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
-      <p className="text-xs text-fg-subtle tabular">{summary ?? `Page ${page}`}</p>
+      <p className="text-xs text-fg-subtle tabular">{summary ?? t('common.page', { page })}</p>
       <div className="flex items-center gap-1.5">
-        <Button size="sm" variant="secondary" onClick={onPrev} disabled={page <= 1 || loading} aria-label="Previous page">
-          <ChevronLeft aria-hidden /> <span className="hidden sm:inline">Previous</span>
+        <Button size="sm" variant="secondary" onClick={onPrev} disabled={page <= 1 || loading} aria-label={t('common.previousPage')}>
+          <ChevronLeft aria-hidden /> <span className="hidden sm:inline">{t('common.previous')}</span>
         </Button>
-        <Button size="sm" variant="secondary" onClick={onNext} disabled={!hasNext || loading} aria-label="Next page">
-          <span className="hidden sm:inline">Next</span> <ChevronRight aria-hidden />
+        <Button size="sm" variant="secondary" onClick={onNext} disabled={!hasNext || loading} aria-label={t('common.nextPage')}>
+          <span className="hidden sm:inline">{t('common.next')}</span> <ChevronRight aria-hidden />
         </Button>
       </div>
     </div>

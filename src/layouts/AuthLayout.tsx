@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import { Logo } from '@/components/brand';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useI18n } from '@/i18n';
 import { usingEmulators } from '@/lib/firebase';
 
 export function AuthLayout({
@@ -17,11 +19,15 @@ export function AuthLayout({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="flex h-14 items-center justify-between px-4 sm:px-6">
+      <header className="flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 sm:px-6">
         <Logo />
-        {aside && <div className="text-sm text-fg-muted">{aside}</div>}
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          {aside && <div className="text-sm text-fg-muted">{aside}</div>}
+          <LanguageSwitcher compact />
+        </div>
       </header>
 
       <main className="flex flex-1 items-start justify-center px-4 pt-[8vh] pb-16 sm:items-center sm:pt-0">
@@ -36,11 +42,11 @@ export function AuthLayout({
       </main>
 
       <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 pb-6 text-xs text-fg-subtle">
-        <span>PRAHARI · SIF precursor intelligence</span>
+        <span>{t('auth.footer')}</span>
         <Link to="/" className="hover:text-fg-muted">
-          Home
+          {t('common.home')}
         </Link>
-        {usingEmulators && <span className="text-info">Local emulators — emails are not sent</span>}
+        {usingEmulators && <span className="text-info">{t('auth.localEmulators')}</span>}
       </footer>
     </div>
   );

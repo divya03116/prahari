@@ -10,17 +10,20 @@ import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { PageHeader } from '@/components/ui/misc';
 import { DataRow, Panel, PanelBody, PanelFooter, PanelHeader } from '@/components/ui/panel';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useReference } from '@/hooks/reference';
+import { useI18n } from '@/i18n';
+import { roleDescriptionKey } from '@/i18n/labels';
 import { errorMessage } from '@/lib/errors';
 import { formatDateTime } from '@/lib/format';
 import { requestPasswordReset, updateDisplayName } from '@/services/auth';
 import { api } from '@/services/callables';
 import { firebase } from '@/lib/firebase';
-import { ROLE_DESCRIPTION } from '@/shared/constants';
 import { profileSchema, type ProfileInput } from '@/shared/schemas';
 
 export default function Settings() {
   const { user, role, profile, signOut } = useAuth();
+  const { t } = useI18n();
   // First-time setup of a fresh project: /app/settings?setup=admin
   const [params] = useSearchParams();
   const setup = params.get('setup') === 'admin' && role !== 'admin';
@@ -30,7 +33,7 @@ export default function Settings() {
     try {
       await api.claimFirstAdmin();
       await firebase.auth.currentUser?.getIdToken(true);
-      toast.success('You are now the administrator');
+      toast.success(t('settings.nowAdmin'));
       window.location.assign('/app');
     } catch (err) {
       toast.error(errorMessage(err));
@@ -57,7 +60,7 @@ export default function Settings() {
     if (!user) return;
     try {
       await updateDisplayName(user, displayName);
-      toast.success('Name updated');
+      toast.success(t('settings.nameUpdated'));
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -68,7 +71,7 @@ export default function Settings() {
     setSending(true);
     try {
       await requestPasswordReset(user.email);
-      toast.success('Password reset link sent', { description: `Check ${user.email}.` });
+      toast.success(t('settings.resetSent'), { description: t('settings.checkAddress', { email: user.email }) });
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
@@ -78,16 +81,16 @@ export default function Settings() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Your profile and account." />
+      <PageHeader title={t('settings.title')} description={t('settings.description')} />
       {setup && (
         <Panel className="mb-5">
           <PanelHeader
-            title="First-time setup"
-            description="A new PRAHARI project has no administrator yet. The address configured at deployment can claim that role once."
+            title={t('settings.firstSetup')}
+            description={t('settings.firstSetupDescription')}
           />
           <PanelFooter>
             <Button variant="primary" loading={claiming} onClick={() => void claimAdmin()}>
-              Become the first administrator
+              {t('settings.becomeAdmin')}
             </Button>
           </PanelFooter>
         </Panel>
@@ -96,64 +99,71 @@ export default function Settings() {
       <div className="flex max-w-2xl flex-col gap-6">
         <Panel>
           <form onSubmit={save} noValidate>
-            <PanelHeader title="Profile" description="Your name appears on verdicts and actions you record. It is never attached to reports you file." />
+            <PanelHeader title={t('settings.profile')} description={t('settings.profileDescription')} />
             <PanelBody className="flex flex-col gap-4">
-              <Field label="Display name" error={errors.displayName?.message}>
+              <Field label={t('settings.displayName')} error={errors.displayName?.message}>
                 <Input autoComplete="name" {...register('displayName')} />
               </Field>
               {user?.email || !user?.phoneNumber ? (
-                <Field label="Email" hint="Your sign-in address. Contact an administrator to change it.">
+                <Field label={t('auth.email')} hint={t('settings.emailHint')}>
                   <Input value={user?.email ?? ''} readOnly className="opacity-70" />
                 </Field>
               ) : (
-                <Field label="Phone" hint="You sign in with this number and an SMS code.">
+                <Field label={t('settings.phone')} hint={t('settings.phoneHint')}>
                   <Input value={user.phoneNumber} readOnly className="opacity-70" />
                 </Field>
               )}
             </PanelBody>
             <PanelFooter>
               <Button type="submit" variant="primary" size="sm" loading={isSubmitting} disabled={!isDirty}>
-                Save
+                {t('common.save')}
               </Button>
             </PanelFooter>
           </form>
         </Panel>
 
         <Panel>
-          <PanelHeader title="Access" description="Roles are assigned by an administrator." />
+          <PanelHeader title={t('settings.language')} description={t('settings.languageDescription')} />
+          <PanelBody>
+            <LanguageSwitcher />
+          </PanelBody>
+        </Panel>
+
+        <Panel>
+          <PanelHeader title={t('settings.access')} description={t('settings.accessDescription')} />
           <PanelBody className="py-1">
             <dl className="divide-y divide-border">
-              <DataRow label="Role">
+              <DataRow label={t('settings.role')}>
                 <RoleBadge role={role} />
               </DataRow>
-              <DataRow label="What it allows">
-                <span className="text-fg-muted">{ROLE_DESCRIPTION[role]}</span>
+              <DataRow label={t('settings.whatItAllows')}>
+                <span className="text-fg-muted">{t(roleDescriptionKey(role))}</span>
               </DataRow>
-              <DataRow label="Installation">{profile?.installationId ? installationName(profile.installationId) : 'Not assigned'}</DataRow>
-              <DataRow label="Member since">{formatDateTime(profile?.createdAt)}</DataRow>
+              <DataRow label={t('settings.installation')}>{profile?.installationId ? installationName(profile.installationId) : t('common.notAssigned')}</DataRow>
+              <DataRow label={t('settings.memberSince')}>{formatDateTime(profile?.createdAt)}</DataRow>
             </dl>
           </PanelBody>
         </Panel>
 
         <Panel>
-          <PanelHeader title="Security" />
+          <PanelHeader title={t('settings.security')} />
           <PanelBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-fg">Password</p>
+              <p className="text-sm text-fg">{t('auth.password')}</p>
               <p className="text-sm text-fg-subtle">
-                {passwordAccount ? 'We email you a link to choose a new password.' : 'You sign in with Google; manage your password there.'}
+                {passwordAccount ? t('settings.passwordEmailLink') : t('settings.passwordGoogle')}
               </p>
             </div>
             {passwordAccount && (
               <Button size="sm" onClick={() => void sendReset()} loading={sending}>
-                Send reset link
+                {t('auth.sendResetLink')}
               </Button>
             )}
           </PanelBody>
           <PanelBody className="flex flex-col gap-4 border-t border-border sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-fg">Sign out</p>
-              <p className="text-sm text-fg-subtle">End your session on this device.</p>
+              <p className="text-sm text-fg">{t('nav.signOut')}</p>
+              <p className="text-sm text-fg-subtle">{t('settings.signOutDescription')}</p>
             </div>
             <Button
               size="sm"
@@ -163,7 +173,7 @@ export default function Settings() {
                 navigate('/signin', { replace: true });
               }}
             >
-              Sign out
+              {t('nav.signOut')}
             </Button>
           </PanelBody>
         </Panel>

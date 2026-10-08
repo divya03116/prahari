@@ -4,6 +4,7 @@ import { Phone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
+import { useI18n } from '@/i18n';
 import { errorMessage } from '@/lib/errors';
 import { confirmPhoneCode, resetPhoneVerifier, sendPhoneCode, signInWithApple, signInWithGoogle } from '@/services/auth';
 import { GoogleButton } from './GoogleButton';
@@ -65,7 +66,8 @@ export function SocialSignIn({
   const [sent, setSent] = useState<ConfirmationResult | null>(null);
   const [busy, setBusy] = useState(false);
   const captcha = useRef<HTMLDivElement>(null);
-  const verb = mode === 'signup' ? 'Sign up' : 'Continue';
+  const { t } = useI18n();
+  const signup = mode === 'signup';
 
   useEffect(() => () => resetPhoneVerifier(), []);
 
@@ -100,18 +102,18 @@ export function SocialSignIn({
 
   return (
     <div className="flex flex-col gap-2.5">
-      <GoogleButton onClick={() => run(signInWithGoogle)} label={`${verb} with Google`} />
-      <AppleButton onClick={() => run(signInWithApple)} label={`${verb} with Apple`} />
+      <GoogleButton onClick={() => run(signInWithGoogle)} label={t(signup ? 'auth.signUpWith' : 'auth.continueWith', { provider: 'Google' })} />
+      <AppleButton onClick={() => run(signInWithApple)} label={t(signup ? 'auth.signUpWith' : 'auth.continueWith', { provider: 'Apple' })} />
 
       {!phoneOpen ? (
         <Button size="lg" className="w-full" onClick={() => setPhoneOpen(true)}>
-          <Phone aria-hidden /> {verb} with phone number
+          <Phone aria-hidden /> {t(signup ? 'auth.signUpWithPhone' : 'auth.continueWithPhone')}
         </Button>
       ) : (
         <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-2 p-4">
           {!sent ? (
             <>
-              <Field label="Phone number" hint="With country code, e.g. +91 98765 43210. We send a one-time code by SMS.">
+              <Field label={t('auth.phoneNumber')} hint={t('auth.phoneHint')}>
                 <Input
                   type="tel"
                   inputMode="tel"
@@ -123,12 +125,12 @@ export function SocialSignIn({
                 />
               </Field>
               <Button variant="primary" loading={busy} disabled={phone.replace(/\D/g, '').length < 8} onClick={() => void send()}>
-                Send code
+                {t('auth.sendCode')}
               </Button>
             </>
           ) : (
             <>
-              <Field label="Code from the SMS" hint={`Sent to ${normalisePhone(phone)}.`}>
+              <Field label={t('auth.smsCode')} hint={t('auth.sentTo', { phone: normalisePhone(phone) })}>
                 <Input
                   inputMode="numeric"
                   autoComplete="one-time-code"
@@ -141,7 +143,7 @@ export function SocialSignIn({
               </Field>
               <div className="flex gap-2">
                 <Button variant="primary" className="flex-1" loading={busy} disabled={code.length !== 6} onClick={() => void verify()}>
-                  Verify and continue
+                  {t('auth.verifyContinue')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -151,7 +153,7 @@ export function SocialSignIn({
                     resetPhoneVerifier();
                   }}
                 >
-                  Change number
+                  {t('auth.changeNumber')}
                 </Button>
               </div>
             </>
