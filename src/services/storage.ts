@@ -10,13 +10,14 @@
 
 import type { UploadTask } from 'firebase/storage';
 
+import { translate } from '@/i18n';
 import { getStorageLazy } from '@/lib/firebase';
 import { LIMITS } from '@/shared/constants';
 
 export function validateFile(file: File): string | null {
-  if (!LIMITS.attachmentTypes.includes(file.type)) return `${file.name}: only JPEG, PNG, WebP or PDF files are accepted.`;
-  if (file.size === 0) return `${file.name} is empty.`;
-  if (file.size > LIMITS.attachmentBytesMax) return `${file.name} is larger than 10 MB.`;
+  if (!LIMITS.attachmentTypes.includes(file.type)) return translate('attach.badType', { name: file.name });
+  if (file.size === 0) return translate('attach.empty', { name: file.name });
+  if (file.size > LIMITS.attachmentBytesMax) return translate('attach.tooLarge', { name: file.name });
   return null;
 }
 

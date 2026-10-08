@@ -27,8 +27,9 @@ import { Alert, EmptyState, ErrorState, Skeleton } from '@/components/ui/feedbac
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { useAsync, useLive } from '@/hooks/data';
 import { useReference } from '@/hooks/reference';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
-import { dayKey, daysUntil, formatDateTime, formatNumber, formatShortDate, initials } from '@/lib/format';
+import { dayKey, daysUntil, formatDateTime, formatMonth, formatNumber, formatShortDate, initials } from '@/lib/format';
 import { actionCounts, isOverdue, listActions } from '@/services/actions';
 import { dailyStatsFrom, heatFromReports, heatSince, statsFromReports } from '@/services/directory';
 import { recentScored, registerCounts, watchRecentReports } from '@/services/reports';
@@ -38,7 +39,6 @@ import type { ActionDoc, DailyStatsDoc, ReportDoc, WithId } from '@/shared/types
 
 const DAY = 86_400_000;
 const MONTHS = 5;
-const monthFmt = new Intl.DateTimeFormat('en-IN', { month: 'short', timeZone: 'UTC' });
 
 function utcMonthStart(offset: number): Date {
   const now = new Date();
@@ -65,21 +65,22 @@ const AVATAR_COLORS = ['bg-[#7c6cf0]', 'bg-[#3a3a42]', 'bg-[#2f9e63]', 'bg-[#d45
 /* ------------------------------------------------------------------ */
 
 function Hero({ active, delta, review, loading }: { active?: number; delta?: number; review?: number; loading: boolean }) {
+  const { t } = useI18n();
   return (
     <section
-      aria-label="Total reports"
+      aria-label={t('dash.totalReports')}
       className="relative flex min-h-[210px] flex-col justify-between overflow-hidden rounded-[18px] bg-[linear-gradient(120deg,#69c98b_0%,#9fd46c_48%,#cfe36a_100%)] p-6 text-[#0b0f0a]"
     >
       <div aria-hidden className="pointer-events-none absolute -top-16 -right-10 size-64 rounded-full bg-white/15 blur-2xl" />
       <div className="relative">
-        <p className="text-xs font-medium text-black/60">Total reports</p>
+        <p className="text-xs font-medium text-black/60">{t('dash.totalReports')}</p>
         {loading ? (
           <div className="mt-2 h-11 w-40 animate-pulse rounded-lg bg-black/10" />
         ) : (
-          <Figure value={formatNumber(active ?? 0)} unit="active" className="mt-1 text-[2.75rem] leading-none" />
+          <Figure value={formatNumber(active ?? 0)} unit={t('dash.active')} className="mt-1 text-[2.75rem] leading-none" />
         )}
         <p className="mt-2 text-xs text-black/60">
-          {delta === undefined ? ' ' : `${delta >= 0 ? '+' : '−'}${Math.abs(delta)} reports from last month`}
+          {delta === undefined ? ' ' : t('dash.deltaFromLastMonth', { delta: `${delta >= 0 ? '+' : '−'}${Math.abs(delta)}` })}
         </p>
       </div>
       <div className="relative mt-6 flex flex-wrap gap-2">
@@ -87,13 +88,13 @@ function Hero({ active, delta, review, loading }: { active?: number; delta?: num
           to="/app/reports/new"
           className="inline-flex h-9 items-center gap-2 rounded-full bg-[#0f140e] px-5 text-sm font-semibold text-white transition-colors hover:bg-black"
         >
-          New report
+          {t('nav.newReport')}
         </Link>
         <Link
           to="/app/reports?view=review"
           className="inline-flex h-9 items-center gap-2 rounded-full bg-white/90 px-4 text-sm font-semibold text-[#0f140e] transition-colors hover:bg-white"
         >
-          Review queue
+          {t('dash.reviewQueue')}
           <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#0f140e] px-1.5 text-2xs text-white tabular">
             {review ?? '·'}
           </span>
@@ -146,6 +147,7 @@ function DeltaCard({
 export default function Dashboard() {
   const navigate = useNavigate();
   const { can, profile } = useAuth();
+  const { t } = useI18n();
   const { installations } = useReference();
   const [flowMode, setFlowMode] = useState<'monthly' | 'weekly'>('monthly');
   const [editing, setEditing] = useState<WithId<ActionDoc> | null>(null);
@@ -182,7 +184,7 @@ export default function Dashboard() {
       for (let i = MONTHS - 1; i >= 0; i--) {
         const start = utcMonthStart(i);
         const key = dayKey(start).slice(0, 7);
-        series.push({ key, label: monthFmt.format(start), value: s.filter((d) => d.day.startsWith(key)).reduce((n, d) => n + d.total, 0) });
+        series.push({ key, label: formatMonth(start), value: s.filter((d) => d.day.startsWith(key)).reduce((n, d) => n + d.total, 0) });
       }
     } else {
       for (let i = 4; i >= 0; i--) {
@@ -191,28 +193,28 @@ export default function Dashboard() {
       }
     }
     return series.map((b, i) => ({ ...b, change: i === 0 ? null : percentChange(b.value, series[i - 1].value) }));
-  }, [s, flowMode]);
+  }, [s, flowMode, t]);
 
   /* hazard split, by month */
   const months = useMemo(() => {
     const keys = [...new Set((sample.data ?? []).map((r) => dayKey(r.createdAt.toDate()).slice(0, 7)))].sort().reverse();
-    return keys.slice(0, 4).map((k) => ({ value: k, label: monthFmt.format(new Date(`${k}-01T00:00:00Z`)) }));
-  }, [sample.data]);
+    return keys.slice(0, 4).map((k) => ({ value: k, label: formatMonth(new Date(`${k}-01T00:00:00Z`)) }));
+  }, [sample.data, t]);
   const [splitMonth, setSplitMonth] = useState<string | null>(null);
   const month = splitMonth ?? months[0]?.value ?? '';
   const slices = useMemo<Slice[]>(() => {
     const by = new Map<string, number>();
     for (const r of sample.data ?? []) {
       if (dayKey(r.createdAt.toDate()).slice(0, 7) !== month) continue;
-      const k = r.energy?.[0]?.short ?? 'No energy named';
+      const k = r.energy?.[0]?.short ?? t('dash.noEnergy');
       by.set(k, (by.get(k) ?? 0) + 1);
     }
     const ranked = [...by.entries()].sort((a, b) => b[1] - a[1]);
     const top = ranked.slice(0, 5);
     const rest = ranked.slice(5).reduce((n, [, v]) => n + v, 0);
-    const rows = rest ? [...top, ['Other', rest] as [string, number]] : top;
+    const rows = rest ? [...top, [t('dash.other'), rest] as [string, number]] : top;
     return rows.map(([label, value], i) => ({ label, value, color: SLICE_COLORS[i % SLICE_COLORS.length] }));
-  }, [sample.data, month]);
+  }, [sample.data, month, t]);
 
   /* installations stack */
   const codes = useMemo(() => new Map(installations.map((i) => [i.id, i])), [installations]);
@@ -249,9 +251,9 @@ export default function Dashboard() {
   const copyLink = async (id: string) => {
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/app/reports/${id}`);
-      toast.success('Link copied');
+      toast.success(t('detail.linkCopied'));
     } catch {
-      toast.error('Could not copy the link');
+      toast.error(t('detail.linkCopyFailed'));
     }
   };
 
@@ -260,23 +262,23 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-5">
-      <h1 className="text-[1.625rem] leading-9 font-bold tracking-[-0.02em] text-fg">My dashboard</h1>
+      <h1 className="text-[1.625rem] leading-9 font-bold tracking-[-0.02em] text-fg">{t('dash.title')}</h1>
 
       {c && c.processing > 0 && (
         <Alert
           tone="info"
-          title={`${c.processing} ${c.processing === 1 ? 'report is' : 'reports are'} being assessed`}
+          title={t(c.processing === 1 ? 'dash.processing.one' : 'dash.processing.many', { count: c.processing })}
           action={
             <Link to="/app/reports?view=processing" className={buttonClass({ size: 'sm' })}>
-              View
+              {t('dash.view')}
             </Link>
           }
         >
-          Scores appear within a few seconds of filing.
+          {t('dash.processingNote')}
         </Alert>
       )}
       {(counts.error || stats.error) && (
-        <Alert tone="critical" action={<Button size="sm" onClick={() => { counts.reload(); stats.reload(); }}>Retry</Button>}>
+        <Alert tone="critical" action={<Button size="sm" onClick={() => { counts.reload(); stats.reload(); }}>{t('common.retry')}</Button>}>
           {counts.error || stats.error}
         </Alert>
       )}
@@ -293,22 +295,22 @@ export default function Dashboard() {
             />
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-1">
               <DeltaCard
-                label="Reports filed"
+                label={t('dash.reportsFiled')}
                 value={weekTotal}
-                unit="new"
+                unit={t('dash.unitNew')}
                 change={percentChange(weekTotal, prevWeekTotal)}
                 goodWhenUp
-                foot="This week"
+                foot={t('dash.thisWeek')}
                 loading={statsLoading}
                 to="/app/reports?sort=newest"
               />
               <DeltaCard
-                label="Tier 1 · Critical"
+                label={t('tier.label', { tier: 1, label: t('tier.1') })}
                 value={weekT1}
                 unit="T1"
                 change={percentChange(weekT1, prevWeekT1)}
                 goodWhenUp={false}
-                foot="This week"
+                foot={t('dash.thisWeek')}
                 loading={statsLoading}
                 to="/app/reports?tier=1"
               />
@@ -318,21 +320,21 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <DashCard>
               <DashCardHeader
-                title="Report flow"
+                title={t('dash.reportFlow')}
                 actions={
                   <>
                     <PillSelect
-                      label="Period"
+                      label={t('dash.period')}
                       value={flowMode}
                       onChange={setFlowMode}
                       options={[
-                        { value: 'monthly', label: 'Monthly' },
-                        { value: 'weekly', label: 'Weekly' },
+                        { value: 'monthly', label: t('dash.monthly') },
+                        { value: 'weekly', label: t('dash.weekly') },
                       ]}
                     />
                     <Link
                       to="/app/insights"
-                      aria-label="Open insights"
+                      aria-label={t('dash.openInsights')}
                       className="inline-flex size-7 items-center justify-center rounded-full border border-border-strong bg-surface-2 text-fg-muted transition-colors hover:text-fg"
                     >
                       <ArrowUpRight className="size-3.5" aria-hidden />
@@ -343,16 +345,16 @@ export default function Dashboard() {
               {statsLoading ? (
                 <Skeleton className="h-52 w-full" />
               ) : (
-                <FlowChart key={flowMode} bars={flow} unit="reports" />
+                <FlowChart key={flowMode} bars={flow} unit={t('dash.unitReports')} />
               )}
             </DashCard>
 
             <DashCard>
               <DashCardHeader
-                title="Hazard split"
+                title={t('dash.hazardSplit')}
                 actions={
                   months.length > 0 ? (
-                    <PillSelect label="Month" value={month} onChange={(v) => setSplitMonth(v)} options={months} />
+                    <PillSelect label={t('dash.month')} value={month} onChange={(v) => setSplitMonth(v)} options={months} />
                   ) : undefined
                 }
               />
@@ -361,11 +363,11 @@ export default function Dashboard() {
               ) : sample.error ? (
                 <ErrorState message={sample.error} onRetry={sample.reload} className="py-6" />
               ) : slices.length ? (
-                <SplitDonut slices={slices} centreLabel="Total" />
+                <SplitDonut slices={slices} centreLabel={t('dash.total')} />
               ) : (
-                <p className="py-10 text-center text-sm text-fg-subtle">No scored reports yet.</p>
+                <p className="py-10 text-center text-sm text-fg-subtle">{t('dash.noScored')}</p>
               )}
-              <p className="mt-4 text-2xs text-fg-subtle">By dominant energy source, from the latest scored reports.</p>
+              <p className="mt-4 text-2xs text-fg-subtle">{t('dash.splitNote')}</p>
             </DashCard>
           </div>
 
@@ -373,11 +375,11 @@ export default function Dashboard() {
           <DashCard className="p-0">
             <div className="px-5 pt-5">
               <DashCardHeader
-                title="Recent reports"
+                title={t('dash.recent')}
                 count={c?.active}
                 actions={
                   <Link to="/app/reports?sort=newest" className="inline-flex items-center gap-1 text-xs font-medium text-fg-muted hover:text-fg">
-                    See all <ArrowRight className="size-3.5" aria-hidden />
+                    {t('dash.seeAll')} <ArrowRight className="size-3.5" aria-hidden />
                   </Link>
                 }
               />
@@ -393,11 +395,11 @@ export default function Dashboard() {
             ) : !recent.data?.length ? (
               <EmptyState
                 icon={<FileText />}
-                title="No reports yet"
-                description="Filed reports are scored in seconds and appear here."
+                title={t('dash.noReports')}
+                description={t('dash.noReportsDesc')}
                 action={
                   <Link to="/app/reports/new" className={buttonClass({ variant: 'primary', size: 'sm' })}>
-                    File the first report
+                    {t('dash.fileFirst')}
                   </Link>
                 }
               />
@@ -413,7 +415,7 @@ export default function Dashboard() {
                       <span className="block truncate text-2xs text-fg-subtle">{formatDateTime(r.createdAt)}</span>
                     </Link>
                     <span className="hidden sm:block">
-                      {r.verdict ? <VerdictBadge verdict={r.verdict.decision} /> : <Badge>Awaiting review</Badge>}
+                      {r.verdict ? <VerdictBadge verdict={r.verdict.decision} /> : <Badge>{t('reports.view.review')}</Badge>}
                     </span>
                     <span className="hidden w-20 truncate text-right font-mono text-2xs text-fg-subtle md:block">
                       {codes.get(r.installationId)?.code || r.installationName}
@@ -423,16 +425,16 @@ export default function Dashboard() {
                     </span>
                     <Menu>
                       <MenuTrigger asChild>
-                        <Button size="icon-sm" variant="ghost" aria-label="Report options">
+                        <Button size="icon-sm" variant="ghost" aria-label={t('dash.reportOptions')}>
                           <MoreVertical aria-hidden />
                         </Button>
                       </MenuTrigger>
                       <MenuContent>
                         <MenuItem icon={<FileText />} onSelect={() => navigate(`/app/reports/${r.id}`)}>
-                          Open report
+                          {t('dash.openReport')}
                         </MenuItem>
                         <MenuItem icon={<Copy />} onSelect={() => void copyLink(r.id)}>
-                          Copy link
+                          {t('detail.copyLink')}
                         </MenuItem>
                       </MenuContent>
                     </Menu>
@@ -447,7 +449,7 @@ export default function Dashboard() {
         <div className="flex min-w-0 flex-col gap-5">
           <DashCard>
             <DashCardHeader
-              title="Installations"
+              title={t('dash.installations')}
               count={stack.length || undefined}
               actions={
                 can('admin') ? (
@@ -455,7 +457,7 @@ export default function Dashboard() {
                     to="/app/admin/reference"
                     className="inline-flex h-7 items-center gap-1.5 rounded-full bg-fg pr-1 pl-3 text-xs font-semibold text-fg-inverse transition-colors hover:bg-white"
                   >
-                    Add
+                    {t('dash.add')}
                     <span className="flex size-5 items-center justify-center rounded-full bg-fg-inverse text-fg">
                       <Plus className="size-3" aria-hidden />
                     </span>
@@ -471,26 +473,26 @@ export default function Dashboard() {
               <CardStack
                 lead={lead}
                 others={others}
-                caption={mine ? 'Your installation · 30 days' : 'Highest potential · 30 days'}
+                caption={mine ? t('dash.yourInstallation') : t('dash.highestPotential')}
                 onOpen={(id) => navigate(`/app/reports?installation=${encodeURIComponent(id)}`)}
               />
             ) : (
-              <p className="py-8 text-center text-sm text-fg-subtle">No reports in the last 30 days.</p>
+              <p className="py-8 text-center text-sm text-fg-subtle">{t('dash.noReports30')}</p>
             )}
           </DashCard>
 
           <DashCard>
             <DashCardHeader
-              title="Open actions"
+              title={t('dash.openActions')}
               count={actionTotals.data?.open}
               actions={
                 <Link to="/app/actions" className="inline-flex items-center gap-1 text-xs font-medium text-fg-muted hover:text-fg">
-                  Manage <ArrowRight className="size-3.5" aria-hidden />
+                  {t('dash.manage')} <ArrowRight className="size-3.5" aria-hidden />
                 </Link>
               }
             />
             {owners.length > 0 && (
-              <div className="mb-4 flex items-center gap-2" aria-label="Action owners">
+              <div className="mb-4 flex items-center gap-2" aria-label={t('dash.actionOwners')}>
                 {owners.map((o, i) => (
                   <span
                     key={o}
@@ -502,7 +504,7 @@ export default function Dashboard() {
                 ))}
                 {actionTotals.data && actionTotals.data.overdue > 0 && (
                   <Link to="/app/actions?view=overdue" className="ml-auto text-2xs font-semibold text-critical hover:underline">
-                    {actionTotals.data.overdue} overdue
+                    {t('dash.overdueCount', { count: actionTotals.data.overdue })}
                   </Link>
                 )}
               </div>
@@ -516,7 +518,7 @@ export default function Dashboard() {
             ) : openActions.error ? (
               <ErrorState message={openActions.error} onRetry={openActions.reload} className="py-6" />
             ) : !actions.length ? (
-              <EmptyState icon={<ClipboardCheck />} title="No open actions" className="py-8" />
+              <EmptyState icon={<ClipboardCheck />} title={t('actions.empty.active')} className="py-8" />
             ) : (
               <ul className="-mx-2 flex flex-col">
                 {actions.slice(0, 5).map((a) => {
@@ -530,25 +532,25 @@ export default function Dashboard() {
                       <Link to={`/app/reports/${a.reportId}`} className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-fg">{a.control}</span>
                         <span className={cn('block truncate text-2xs', late ? 'text-critical' : 'text-fg-subtle')}>
-                          Due {formatShortDate(a.dueAt)} · {a.installationName}
+                          {t('detail.due', { date: formatShortDate(a.dueAt) })} · {a.installationName}
                         </span>
                       </Link>
                       <span className={cn('shrink-0 text-xs font-bold tabular', late ? 'text-critical' : 'text-fg')}>
-                        {d === null ? '' : late ? `${-d}d late` : d === 0 ? 'Today' : `${d}d`}
+                        {d === null ? '' : late ? t('dash.daysLate', { days: -d }) : d === 0 ? t('dash.today') : t('dash.daysShort', { days: d })}
                       </span>
                       <Menu>
                         <MenuTrigger asChild>
-                          <Button size="icon-sm" variant="ghost" aria-label="Action options">
+                          <Button size="icon-sm" variant="ghost" aria-label={t('dash.actionOptions')}>
                             <MoreVertical aria-hidden />
                           </Button>
                         </MenuTrigger>
                         <MenuContent>
                           <MenuItem icon={<FileText />} onSelect={() => navigate(`/app/reports/${a.reportId}`)}>
-                            Open report
+                            {t('dash.openReport')}
                           </MenuItem>
                           {editable(a) && (
                             <MenuItem icon={<SquarePen />} onSelect={() => setEditing(a)}>
-                              Update action
+                              {t('dash.updateAction')}
                             </MenuItem>
                           )}
                         </MenuContent>

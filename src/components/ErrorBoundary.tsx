@@ -1,6 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
+import { translate as t } from '@/i18n';
+
 import { Button } from './ui/button';
 
 interface State {
@@ -32,12 +34,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode; inline?: boo
           <div className="mb-3 flex size-9 items-center justify-center rounded-md border border-critical-line bg-critical-soft text-critical">
             <AlertTriangle className="size-4" aria-hidden />
           </div>
-          <p className="text-sm font-medium text-fg">{chunk ? 'A new version is available' : 'Something went wrong'}</p>
+          <p className="text-sm font-medium text-fg">{chunk ? t('crash.newVersion') : t('crash.title')}</p>
           <p className="mt-1 text-sm text-fg-muted">
-            {chunk ? 'Reload to continue with the latest version.' : 'This screen hit an unexpected error. Reloading usually fixes it.'}
+            {chunk ? t('crash.reloadNew') : t('crash.desc')}
           </p>
           <Button className="mt-4" size="sm" onClick={() => window.location.reload()}>
-            Reload
+            {t('crash.reload')}
           </Button>
         </div>
       </div>

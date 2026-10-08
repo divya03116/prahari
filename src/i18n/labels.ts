@@ -3,6 +3,9 @@
  * The stored value never changes with the language; only its label does.
  */
 import type { ActionStatus, ReportType, Role, Shift, Tier, Verdict } from '@/shared/constants';
+import type { SpanKind } from '@/shared/engine';
+import type { PpeType } from '@/shared/ppe';
+import type { ReportSource } from '@/shared/structure';
 
 import type { MessageKey } from './en';
 
@@ -13,3 +16,7 @@ export const actionStatusKey = (status: ActionStatus): MessageKey => `actionStat
 export const verdictKey = (verdict: Verdict): MessageKey => `verdict.${verdict}`;
 export const reportTypeKey = (type: ReportType): MessageKey => `type.${type}`;
 export const shiftKey = (shift: Shift): MessageKey => `shift.${shift}`;
+export const verdictHelpKey = (verdict: Verdict): MessageKey => `verdictHelp.${verdict}`;
+export const sourceKey = (source: ReportSource): MessageKey => `source.${source}`;
+export const ppeKey = (type: PpeType): MessageKey => `ppe.${type}`;
+export const spanKey = (kind: SpanKind): MessageKey => `span.${kind}`;

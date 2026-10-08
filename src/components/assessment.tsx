@@ -8,6 +8,8 @@
 import { Fragment, useMemo } from 'react';
 import { ShieldAlert } from 'lucide-react';
 
+import { useI18n } from '@/i18n';
+import { spanKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import type { Contribution, EvidenceSpan, Hit, RuleHit, SpanKind, Tier } from '@/shared/engine';
 
@@ -49,16 +51,9 @@ const SPAN_STYLE: Record<SpanKind, string> = {
   mitigator: 'bg-success-soft text-fg decoration-success',
 };
 
-const SPAN_LABEL: Record<SpanKind, string> = {
-  energy: 'Energy',
-  barrier: 'Failed barrier',
-  exposure: 'Exposure',
-  aggravator: 'Aggravator',
-  mitigator: 'Mitigator',
-};
-
 /** The narrative with every phrase the engine used highlighted and labelled. */
 export function EvidenceText({ text, spans, className }: { text: string; spans: EvidenceSpan[] | undefined; className?: string }) {
+  const { t } = useI18n();
   const parts = useMemo(() => {
     const sorted = [...(spans ?? [])].sort((a, b) => a.start - b.start);
     const out: { text: string; kind?: SpanKind }[] = [];
@@ -79,7 +74,7 @@ export function EvidenceText({ text, spans, className }: { text: string; spans: 
         p.kind ? (
           <mark
             key={i}
-            title={SPAN_LABEL[p.kind]}
+            title={t(spanKey(p.kind))}
             className={cn('rounded-[3px] px-0.5 underline decoration-1 underline-offset-4', SPAN_STYLE[p.kind])}
           >
             {p.text}
@@ -93,6 +88,7 @@ export function EvidenceText({ text, spans, className }: { text: string; spans: 
 }
 
 export function EvidenceLegend() {
+  const { t } = useI18n();
   const kinds: SpanKind[] = ['energy', 'barrier', 'exposure', 'aggravator', 'mitigator'];
   const dot: Record<SpanKind, string> = {
     energy: 'bg-critical',
@@ -106,7 +102,7 @@ export function EvidenceLegend() {
       {kinds.map((k) => (
         <li key={k} className="inline-flex items-center gap-1.5">
           <span aria-hidden className={cn('size-2 rounded-[2px]', dot[k])} />
-          {SPAN_LABEL[k]}
+          {t(spanKey(k))}
         </li>
       ))}
     </ul>
@@ -142,14 +138,15 @@ function HitList({ title, hits, empty, tone }: { title: string; hits: Hit[] | un
 
 /** Energy / barrier / exposure, side by side. */
 export function FindingsGrid({ energy, barrier, exposure }: { energy?: Hit[]; barrier?: Hit[]; exposure?: Hit[] }) {
+  const { t } = useI18n();
   return (
     // Sized by its container, not the viewport: the same grid sits in a wide
     // report page and in the narrow live-preview panel.
     <div className="@container">
       <div className="grid gap-px overflow-hidden rounded-md border border-border bg-border @xl:grid-cols-3">
-        <HitList title="Energy source" hits={energy} empty="No hazardous energy described." tone="text-critical" />
-        <HitList title="Failed barrier" hits={barrier} empty="No failed control described." tone="text-warning" />
-        <HitList title="Exposure" hits={exposure} empty="No person described in the line of fire." tone="text-info" />
+        <HitList title={t('assess.energySource')} hits={energy} empty={t('assess.noEnergy')} tone="text-critical" />
+        <HitList title={t('span.barrier')} hits={barrier} empty={t('assess.noBarrier')} tone="text-warning" />
+        <HitList title={t('span.exposure')} hits={exposure} empty={t('assess.noExposure')} tone="text-info" />
       </div>
     </div>
   );
@@ -157,6 +154,7 @@ export function FindingsGrid({ energy, barrier, exposure }: { energy?: Hit[]; ba
 
 /** How the score was built, line by line. */
 export function Contributions({ items, score }: { items: Contribution[] | undefined; score: number }) {
+  const { t } = useI18n();
   if (!items?.length) return null;
   return (
     <div className="overflow-hidden rounded-md border border-border">
@@ -177,7 +175,7 @@ export function Contributions({ items, score }: { items: Contribution[] | undefi
         ))}
       </ul>
       <div className="flex items-center justify-between border-t border-border-strong bg-surface-2 px-3.5 py-2 text-sm">
-        <span className="font-medium text-fg">SIF potential</span>
+        <span className="font-medium text-fg">{t('assess.sifPotential')}</span>
         <span className="font-mono text-xs font-semibold text-fg tabular">{score} / 100</span>
       </div>
     </div>
@@ -186,12 +184,13 @@ export function Contributions({ items, score }: { items: Contribution[] | undefi
 
 /** Life-saving rules the narrative describes being broken. */
 export function RuleNet({ rules, escalated, preRuleScore }: { rules: RuleHit[] | undefined; escalated?: boolean; preRuleScore?: number }) {
+  const { t } = useI18n();
   if (!rules?.length) return null;
   return (
     <div className="rounded-md border border-signal/35 bg-signal-soft p-3.5">
       <div className="flex items-center gap-2 text-sm font-medium text-signal">
         <ShieldAlert className="size-4" aria-hidden />
-        Life-saving rule {rules.length > 1 ? 'breaches' : 'breach'}
+        {rules.length > 1 ? t('assess.ruleBreaches') : t('assess.ruleBreach')}
       </div>
       <ul className="mt-2 flex flex-col gap-1.5">
         {rules.map((r) => (
@@ -203,8 +202,7 @@ export function RuleNet({ rules, escalated, preRuleScore }: { rules: RuleHit[] |
       </ul>
       {escalated && (
         <p className="mt-2 text-xs text-fg-muted">
-          The rule net raised this report from {preRuleScore} to the Tier 1 floor. It is a floor, never a multiplier:
-          it can only lift a score, and only to 70.
+          {t('assess.ruleNet', { score: preRuleScore ?? 0 })}
         </p>
       )}
     </div>

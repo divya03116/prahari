@@ -14,37 +14,40 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field, Textarea } from '@/components/ui/field';
 import { DataRow, Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
+import { useI18n, type MessageKey } from '@/i18n';
+import { ppeKey, reportTypeKey, sourceKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { formatDateTime } from '@/lib/format';
 import { api } from '@/services/callables';
 import { attachmentUrl } from '@/services/storage';
-import { LIMITS, REPORT_TYPE_LABEL } from '@/shared/constants';
+import { LIMITS } from '@/shared/constants';
 import { HAZARDS } from '@/shared/hazards';
-import { PPE_LABEL, type PpeType } from '@/shared/ppe';
-import { NOT_SPECIFIED, SOURCE_LABEL, type ReportSource, type StructuredIncident } from '@/shared/structure';
+import type { PpeType } from '@/shared/ppe';
+import { NOT_SPECIFIED, type ReportSource, type StructuredIncident } from '@/shared/structure';
 import type { ReportDoc, WithId } from '@/shared/types';
 
 export function SourceBadge({ source }: { source: ReportSource | undefined }) {
+  const { t } = useI18n();
   const s = source ?? 'text';
   const icon =
     s === 'camera' ? <Camera className="size-3" /> : s === 'photo' ? <ImageIcon className="size-3" /> : s === 'voice' ? <Mic className="size-3" /> : <Keyboard className="size-3" />;
   return (
     <Badge tone={s === 'camera' || s === 'photo' ? 'signal' : 'neutral'}>
       {icon}
-      {SOURCE_LABEL[s]}
+      {t(sourceKey(s))}
     </Badge>
   );
 }
 
-const FIELDS: [keyof StructuredIncident, string][] = [
-  ['title', 'Title'],
-  ['hazardType', 'Hazard type'],
-  ['location', 'Location'],
-  ['severity', 'Severity'],
-  ['potentialConsequence', 'Potential consequence'],
-  ['recommendedAction', 'Recommended immediate action'],
-  ['description', 'Description'],
+const FIELDS: [keyof StructuredIncident, MessageKey][] = [
+  ['title', 'incident.field.title'],
+  ['hazardType', 'incident.field.hazardType'],
+  ['location', 'incident.field.location'],
+  ['severity', 'incident.field.severity'],
+  ['potentialConsequence', 'incident.field.potentialConsequence'],
+  ['recommendedAction', 'incident.field.recommendedAction'],
+  ['description', 'incident.field.description'],
 ];
 
 export function StructuredIncidentPanel({
@@ -56,18 +59,15 @@ export function StructuredIncidentPanel({
   preview?: boolean;
   createdAt?: ReportDoc['createdAt'];
 }) {
+  const { t } = useI18n();
   return (
     <Panel>
       <PanelHeader
-        title="Structured incident"
-        description={
-          preview
-            ? 'Extracted from your words as you type. Anything not in the report stays “Not specified”.'
-            : 'Extracted from the report by rule-based NLP. Nothing is filled in that the report does not say.'
-        }
+        title={t('incident.structured.title')}
+        description={preview ? t('incident.structured.previewDesc') : t('incident.structured.desc')}
         actions={
           <Badge tone="info">
-            <Sparkles className="size-3" /> Rule-based NLP
+            <Sparkles className="size-3" /> {t('incident.structured.badge')}
           </Badge>
         }
       />
@@ -76,18 +76,20 @@ export function StructuredIncidentPanel({
           {FIELDS.map(([key, label]) => {
             const v = String(structured[key] ?? NOT_SPECIFIED);
             return (
-              <DataRow key={key} label={label}>
-                <span className={cn('block text-left sm:text-right', v === NOT_SPECIFIED && 'text-fg-subtle italic')}>{v}</span>
+              <DataRow key={key} label={t(label)}>
+                <span className={cn('block text-left sm:text-right', v === NOT_SPECIFIED && 'text-fg-subtle italic')}>
+                  {v === NOT_SPECIFIED ? t('common.notSpecified') : v}
+                </span>
               </DataRow>
             );
           })}
-          <DataRow label="Source">
+          <DataRow label={t('incident.source')}>
             <SourceBadge source={structured.source} />
           </DataRow>
-          {createdAt && <DataRow label="Timestamp">{formatDateTime(createdAt)}</DataRow>}
+          {createdAt && <DataRow label={t('incident.timestamp')}>{formatDateTime(createdAt)}</DataRow>}
         </dl>
         <details className="border-t border-border py-3 text-sm">
-          <summary className="cursor-pointer text-xs font-medium text-fg-muted">Original report (kept exactly as given)</summary>
+          <summary className="cursor-pointer text-xs font-medium text-fg-muted">{t('incident.original')}</summary>
           <p className="mt-2 whitespace-pre-wrap text-fg-muted">{structured.originalReport}</p>
         </details>
       </PanelBody>
@@ -97,6 +99,7 @@ export function StructuredIncidentPanel({
 
 /** The evidence frame with every worker's box drawn over it. */
 export function CameraEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
+  const { t } = useI18n();
   const ppe = report.ppe;
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -114,16 +117,16 @@ export function CameraEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
   return (
     <Panel>
       <PanelHeader
-        title="Camera evidence"
-        description={`${report.camera?.label ?? 'Camera'} · ${formatDateTime(ppe.detectedAt)}`}
+        title={t('incident.camera.title')}
+        description={`${report.camera?.label ?? t('incident.camera.fallback')} · ${formatDateTime(ppe.detectedAt)}`}
         actions={<SourceBadge source="camera" />}
       />
       <PanelBody className="flex flex-col gap-4">
         <div className="relative overflow-hidden rounded-xl border border-border bg-canvas" style={{ aspectRatio: `${ppe.frame.width} / ${ppe.frame.height}` }}>
           {url ? (
-            <img src={url} alt="Frame captured when the violation was confirmed" className="absolute inset-0 size-full object-contain" />
+            <img src={url} alt={t('incident.camera.altViolation')} className="absolute inset-0 size-full object-contain" />
           ) : (
-            <p className="absolute inset-0 flex items-center justify-center text-sm text-fg-subtle">{error ?? 'Loading evidence…'}</p>
+            <p className="absolute inset-0 flex items-center justify-center text-sm text-fg-subtle">{error ?? t('incident.camera.loading')}</p>
           )}
           <svg viewBox={`0 0 ${ppe.frame.width} ${ppe.frame.height}`} className="absolute inset-0 size-full" aria-hidden>
             {ppe.workers.map((w) => (
@@ -149,18 +152,19 @@ export function CameraEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
           {ppe.workers.map((w) => (
             <div key={w.trackId} className="rounded-xl border border-border bg-surface-2 p-3 text-sm">
               <p className="font-semibold text-fg">
-                Worker W{w.trackId} <span className="font-normal text-fg-subtle">· person {Math.round(w.confidence * 100)}%</span>
+                {t('incident.worker', { id: w.trackId })}{' '}
+                <span className="font-normal text-fg-subtle">{t('incident.person', { percent: Math.round(w.confidence * 100) })}</span>
               </p>
               <ul className="mt-1.5 flex flex-col gap-1">
-                {ppe.required.map((t) => {
-                  const s = w.ppe[t];
+                {ppe.required.map((item) => {
+                  const s = w.ppe[item];
                   return (
-                    <li key={t} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="text-fg-muted">{PPE_LABEL[t as PpeType]}</span>
+                    <li key={item} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-fg-muted">{t(ppeKey(item as PpeType))}</span>
                       {s?.state === 'present' ? (
-                        <span className="text-success">Worn · {Math.round((s.confidence ?? 0) * 100)}%</span>
+                        <span className="text-success">{t('incident.worn', { percent: Math.round((s.confidence ?? 0) * 100) })}</span>
                       ) : (
-                        <span className="font-semibold text-critical">Missing</span>
+                        <span className="font-semibold text-critical">{t('incident.missing')}</span>
                       )}
                     </li>
                   );
@@ -171,21 +175,28 @@ export function CameraEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
         </div>
 
         <dl className="divide-y divide-border rounded-xl border border-border px-3">
-          <DataRow label="Violation">
-            {[...new Set(ppe.violations.map((v) => PPE_LABEL[v.type]))].join(', ')}
+          <DataRow label={t('incident.violation')}>
+            {[...new Set(ppe.violations.map((v) => t(ppeKey(v.type))))].join(', ')}
           </DataRow>
-          <DataRow label="Confirmed over">
-            {Math.max(...ppe.violations.map((v) => v.frames))} frames · {Math.max(...ppe.violations.map((v) => v.seconds)).toFixed(1)} s
+          <DataRow label={t('incident.confirmedOver')}>
+            {t('incident.framesSeconds', {
+              frames: Math.max(...ppe.violations.map((v) => v.frames)),
+              seconds: Math.max(...ppe.violations.map((v) => v.seconds)).toFixed(1),
+            })}
           </DataRow>
-          <DataRow label="Camera">
+          <DataRow label={t('incident.camera.fallback')}>
             {report.camera?.label} <span className="font-mono text-2xs text-fg-subtle">({report.camera?.id})</span>
           </DataRow>
-          <DataRow label="Model">
+          <DataRow label={t('incident.model')}>
             {ppe.model.name} · {ppe.model.architecture} · {ppe.model.backend}
           </DataRow>
-          <DataRow label="Thresholds">
-            conf ≥ {ppe.settings.minConfidence} · {ppe.settings.confirmationFrames} frames · {ppe.settings.violationSeconds} s · cooldown{' '}
-            {ppe.settings.incidentCooldownSeconds} s
+          <DataRow label={t('incident.thresholds')}>
+            {t('incident.thresholds.ppe', {
+              conf: ppe.settings.minConfidence,
+              frames: ppe.settings.confirmationFrames,
+              seconds: ppe.settings.violationSeconds,
+              cooldown: ppe.settings.incidentCooldownSeconds,
+            })}
           </DataRow>
         </dl>
       </PanelBody>
@@ -195,6 +206,7 @@ export function CameraEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
 
 /** The evidence frame for a camera hazard, with what the models saw drawn over it. */
 export function HazardEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
+  const { t } = useI18n();
   const hz = report.hazard;
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -215,16 +227,16 @@ export function HazardEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
   return (
     <Panel>
       <PanelHeader
-        title="Camera evidence"
-        description={`${report.camera?.label ?? 'Camera'} · ${formatDateTime(hz.detectedAt)}`}
+        title={t('incident.camera.title')}
+        description={`${report.camera?.label ?? t('incident.camera.fallback')} · ${formatDateTime(hz.detectedAt)}`}
         actions={<SourceBadge source="camera" />}
       />
       <PanelBody className="flex flex-col gap-4">
         <div className="relative overflow-hidden rounded-xl border border-border bg-canvas" style={{ aspectRatio: `${fw} / ${fh}` }}>
           {url ? (
-            <img src={url} alt="Frame captured when the hazard was confirmed" className="absolute inset-0 size-full object-contain" />
+            <img src={url} alt={t('incident.camera.altHazard')} className="absolute inset-0 size-full object-contain" />
           ) : (
-            <p className="absolute inset-0 flex items-center justify-center text-sm text-fg-subtle">{error ?? 'Loading evidence…'}</p>
+            <p className="absolute inset-0 flex items-center justify-center text-sm text-fg-subtle">{error ?? t('incident.camera.loading')}</p>
           )}
           <svg viewBox={`0 0 ${fw} ${fh}`} className="absolute inset-0 size-full" aria-hidden>
             {hz.other && (
@@ -254,29 +266,31 @@ export function HazardEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
         </div>
 
         <dl className="divide-y divide-border rounded-xl border border-border px-3">
-          <DataRow label="Hazard">
-            {info.label} · {REPORT_TYPE_LABEL[info.kind]}
+          <DataRow label={t('incident.hazard')}>
+            {info.label} · {t(reportTypeKey(info.kind))}
           </DataRow>
-          <DataRow label="Seen">
+          <DataRow label={t('incident.seen')}>
             {hz.subject.label} {Math.round(hz.subject.confidence * 100)}%
             {hz.other && ` · ${hz.other.label} ${Math.round(hz.other.confidence * 100)}%`}
           </DataRow>
           {hz.zone && (
-            <DataRow label="Zone">
-              {hz.zone.name} · {hz.zone.kind === 'danger' ? 'restricted' : 'keep clear'}
+            <DataRow label={t('incident.zone')}>
+              {hz.zone.name} · {hz.zone.kind === 'danger' ? t('incident.zone.restricted') : t('incident.zone.keepClear')}
             </DataRow>
           )}
-          {hz.objects && hz.objects.length > 0 && <DataRow label="Objects in the zone">{hz.objects.join(', ')}</DataRow>}
-          {hz.method && <DataRow label="Judged from">{hz.method === 'pose' ? 'Body pose (keypoints)' : 'Body shape (box proportions)'}</DataRow>}
-          <DataRow label="Confirmed over">
-            {hz.frames} frames · {hz.seconds.toFixed(1)} s
+          {hz.objects && hz.objects.length > 0 && <DataRow label={t('incident.objectsInZone')}>{hz.objects.join(', ')}</DataRow>}
+          {hz.method && (
+            <DataRow label={t('incident.judgedFrom')}>{hz.method === 'pose' ? t('incident.method.pose') : t('incident.method.shape')}</DataRow>
+          )}
+          <DataRow label={t('incident.confirmedOver')}>
+            {t('incident.framesSeconds', { frames: hz.frames, seconds: hz.seconds.toFixed(1) })}
           </DataRow>
-          <DataRow label="Camera">
+          <DataRow label={t('incident.camera.fallback')}>
             {report.camera?.label} <span className="font-mono text-2xs text-fg-subtle">({report.camera?.id})</span>
           </DataRow>
-          <DataRow label="Models">{hz.models.map((m) => `${m.name} · ${m.architecture}`).join(', ')}</DataRow>
-          <DataRow label="Thresholds">
-            conf ≥ {hz.settings.minConfidence} · cooldown {hz.settings.incidentCooldownSeconds} s
+          <DataRow label={t('incident.models')}>{hz.models.map((m) => `${m.name} · ${m.architecture}`).join(', ')}</DataRow>
+          <DataRow label={t('incident.thresholds')}>
+            {t('incident.thresholds.hazard', { conf: hz.settings.minConfidence, cooldown: hz.settings.incidentCooldownSeconds })}
           </DataRow>
         </dl>
       </PanelBody>
@@ -286,23 +300,24 @@ export function HazardEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
 
 /** What the AI photo check found when it drafted a worker's photo report. */
 export function PhotoCheckPanel({ report }: { report: WithId<ReportDoc> }) {
+  const { t } = useI18n();
   const check = report.photoCheck;
   if (report.source !== 'photo' || !check) return null;
   return (
     <Panel>
       <PanelHeader
-        title="AI photo check"
-        description="The worker's photo was checked by the models below, which drafted this report."
+        title={t('incident.photoCheck.title')}
+        description={t('incident.photoCheck.desc')}
         actions={<SourceBadge source="photo" />}
       />
       <PanelBody className="py-1">
         <dl className="divide-y divide-border">
           {check.findings.map((f) => (
-            <DataRow key={f.type} label={f.type === 'missing-ppe' ? 'Missing PPE' : (HAZARDS[f.type as keyof typeof HAZARDS]?.label ?? f.type)}>
+            <DataRow key={f.type} label={f.type === 'missing-ppe' ? t('incident.missingPpe') : (HAZARDS[f.type as keyof typeof HAZARDS]?.label ?? f.type)}>
               {Math.round(f.confidence * 100)}%
             </DataRow>
           ))}
-          <DataRow label="Models">{check.models.join(', ')}</DataRow>
+          <DataRow label={t('incident.models')}>{check.models.join(', ')}</DataRow>
         </dl>
       </PanelBody>
     </Panel>
@@ -311,6 +326,7 @@ export function PhotoCheckPanel({ report }: { report: WithId<ReportDoc> }) {
 
 /** Workers' own accounts of the event, by voice or typing. */
 export function StatementsPanel({ report, canAdd }: { report: WithId<ReportDoc>; canAdd: boolean }) {
+  const { t } = useI18n();
   const [text, setText] = useState('');
   const [voice, setVoice] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -319,13 +335,13 @@ export function StatementsPanel({ report, canAdd }: { report: WithId<ReportDoc>;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (text.trim().length < 3) {
-      toast.error('Write at least a few words.');
+      toast.error(t('incident.statements.tooShort'));
       return;
     }
     setBusy(true);
     try {
       await api.addStatement({ reportId: report.id, text: text.trim(), source: voice ? 'voice' : 'text' });
-      toast.success('Statement added to this incident');
+      toast.success(t('incident.statements.added'));
       setText('');
       setVoice(false);
     } catch (err) {
@@ -338,12 +354,12 @@ export function StatementsPanel({ report, canAdd }: { report: WithId<ReportDoc>;
   return (
     <Panel>
       <PanelHeader
-        title="Worker statements"
-        description="Voice and text accounts attached to this incident, each kept as a separate source."
+        title={t('incident.statements.title')}
+        description={t('incident.statements.desc')}
       />
       <PanelBody className="flex flex-col gap-4">
         {statements.length === 0 ? (
-          <p className="text-sm text-fg-subtle">No statements yet.</p>
+          <p className="text-sm text-fg-subtle">{t('incident.statements.none')}</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {statements.map((s) => (
@@ -360,12 +376,12 @@ export function StatementsPanel({ report, canAdd }: { report: WithId<ReportDoc>;
         {canAdd && (
           <form onSubmit={submit} className="flex flex-col gap-3 border-t border-border pt-4" noValidate>
             <VoiceInput value={text} onChange={setText} onUsed={() => setVoice(true)} />
-            <Field label="Add a statement" hint="Say or type what you saw. You can edit a dictated statement before adding it.">
+            <Field label={t('incident.statements.add')} hint={t('incident.statements.hint')}>
               <Textarea rows={3} maxLength={LIMITS.reportTextMax} value={text} onChange={(e) => setText(e.target.value)} />
             </Field>
             <div className="flex justify-end">
               <Button type="submit" variant="primary" size="sm" loading={busy}>
-                Add statement
+                {t('incident.statements.addButton')}
               </Button>
             </div>
           </form>

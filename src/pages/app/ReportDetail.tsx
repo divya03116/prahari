@@ -26,6 +26,8 @@ import { PageHeader } from '@/components/ui/misc';
 import { DataRow, Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
 import { CameraEvidencePanel, HazardEvidencePanel, PhotoCheckPanel, StatementsPanel, StructuredIncidentPanel } from '@/components/IncidentPanels';
 import { useLive } from '@/hooks/data';
+import { useI18n } from '@/i18n';
+import { reportTypeKey, shiftKey, sourceKey, verdictHelpKey, verdictKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { daysUntil, formatDate, formatDateTime, formatRelative } from '@/lib/format';
@@ -33,19 +35,12 @@ import { isOverdue, watchReportActions } from '@/services/actions';
 import { api } from '@/services/callables';
 import { watchReport } from '@/services/reports';
 import { scopeKey, type ReportScope } from '@/services/scope';
-import { LIMITS, REPORT_TYPE_LABEL, VERDICT_LABEL, VERDICTS, type Verdict } from '@/shared/constants';
-import { SOURCE_LABEL } from '@/shared/structure';
+import { LIMITS, VERDICTS, type Verdict } from '@/shared/constants';
 import type { ActionDoc, ReportDoc, WithId } from '@/shared/types';
-
-const VERDICT_HELP: Record<Verdict, string> = {
-  confirmed: 'The assessment is right.',
-  escalated: 'The potential is higher than scored.',
-  downgraded: 'The potential is lower than scored.',
-  dismissed: 'Not a genuine safety observation.',
-};
 
 function VerdictPanel({ report }: { report: WithId<ReportDoc> }) {
   const { can } = useAuth();
+  const { t } = useI18n();
   const officer = can('hse-officer');
   const [editing, setEditing] = useState(false);
   const [decision, setDecision] = useState<Verdict>(report.verdict?.decision ?? 'confirmed');
@@ -59,7 +54,7 @@ function VerdictPanel({ report }: { report: WithId<ReportDoc> }) {
     setBusy(true);
     try {
       await api.recordVerdict({ reportId: report.id, decision, note: note.trim() });
-      toast.success(`Verdict recorded: ${VERDICT_LABEL[decision]}`);
+      toast.success(t('detail.verdictRecorded', { verdict: t(verdictKey(decision)) }));
       setEditing(false);
     } catch (err) {
       toast.error(errorMessage(err));
@@ -71,11 +66,11 @@ function VerdictPanel({ report }: { report: WithId<ReportDoc> }) {
   return (
     <Panel>
       <PanelHeader
-        title="Officer review"
+        title={t('detail.officerReview')}
         actions={
           report.verdict && canRecord && !editing ? (
             <Button size="xs" variant="ghost" onClick={() => setEditing(true)}>
-              Change
+              {t('common.change')}
             </Button>
           ) : undefined
         }
@@ -94,12 +89,12 @@ function VerdictPanel({ report }: { report: WithId<ReportDoc> }) {
         )}
         {!report.verdict && !canRecord && (
           <p className="text-sm text-fg-subtle">
-            {report.status !== 'scored' ? 'Available once the report is scored.' : 'Not reviewed yet. An HSE officer records the verdict.'}
+            {report.status !== 'scored' ? t('detail.availableOnceScored') : t('detail.notReviewed')}
           </p>
         )}
         {showForm && (
           <fieldset disabled={busy} className="flex flex-col gap-3">
-            <legend className="sr-only">Verdict</legend>
+            <legend className="sr-only">{t('detail.verdict')}</legend>
             <div className="flex flex-col gap-1.5">
               {VERDICTS.map((v) => (
                 <label
@@ -118,23 +113,23 @@ function VerdictPanel({ report }: { report: WithId<ReportDoc> }) {
                     className="mt-1 accent-[var(--color-signal)]"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-fg">{VERDICT_LABEL[v]}</span>
-                    <span className="block text-xs text-fg-subtle">{VERDICT_HELP[v]}</span>
+                    <span className="block text-sm font-medium text-fg">{t(verdictKey(v))}</span>
+                    <span className="block text-xs text-fg-subtle">{t(verdictHelpKey(v))}</span>
                   </span>
                 </label>
               ))}
             </div>
-            <Field label="Note" optional>
+            <Field label={t('detail.note')} optional>
               <Textarea rows={3} maxLength={LIMITS.noteMax} value={note} onChange={(e) => setNote(e.target.value)} />
             </Field>
             <div className="flex justify-end gap-2">
               {editing && (
                 <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               )}
               <Button variant="primary" size="sm" loading={busy} onClick={() => void save()}>
-                Record verdict
+                {t('detail.recordVerdict')}
               </Button>
             </div>
           </fieldset>
@@ -146,6 +141,7 @@ function VerdictPanel({ report }: { report: WithId<ReportDoc> }) {
 
 function ActionsPanel({ report }: { report: WithId<ReportDoc> }) {
   const { user, can, profile } = useAuth();
+  const { t } = useI18n();
   const scope = useReportScope();
   const officer = can('hse-officer');
   const admin = can('admin');
@@ -165,12 +161,12 @@ function ActionsPanel({ report }: { report: WithId<ReportDoc> }) {
   return (
     <Panel>
       <PanelHeader
-        title="Corrective actions"
-        description={report.tier && report.tier <= 2 ? 'Drafted by the engine on scoring; officers manage them here.' : undefined}
+        title={t('nav.actions')}
+        description={report.tier && report.tier <= 2 ? t('detail.actionsDesc') : undefined}
         actions={
           officer && !report.archived && report.status === 'scored' ? (
             <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus aria-hidden /> Add action
+              <Plus aria-hidden /> {t('detail.addAction')}
             </Button>
           ) : undefined
         }
@@ -185,13 +181,9 @@ function ActionsPanel({ report }: { report: WithId<ReportDoc> }) {
       ) : !actions.data?.length ? (
         <EmptyState
           icon={<ClipboardCheck />}
-          title="No corrective actions"
+          title={t('detail.noActions')}
           description={
-            report.tier === 3
-              ? 'Tier 3 reports do not open actions automatically.'
-              : report.status === 'scored'
-                ? 'None recorded for this report.'
-                : 'Actions are drafted once the report is scored.'
+            report.tier === 3 ? t('detail.noActions.tier3') : report.status === 'scored' ? t('detail.noActions.none') : t('detail.noActions.pending')
           }
         />
       ) : (
@@ -209,21 +201,21 @@ function ActionsPanel({ report }: { report: WithId<ReportDoc> }) {
                     <ActionStatusBadge status={a.status} />
                     <span>{a.owner}</span>
                     <span className={cn(late && 'text-critical')}>
-                      Due {formatDate(a.dueAt)}
-                      {late && due !== null ? ` · ${-due}d overdue` : ''}
+                      {t('detail.due', { date: formatDate(a.dueAt) })}
+                      {late && due !== null ? ` · ${t('detail.overdue', { days: -due })}` : ''}
                     </span>
-                    {a.source === 'manual' && <Badge>Manual</Badge>}
+                    {a.source === 'manual' && <Badge>{t('detail.manual')}</Badge>}
                   </div>
                   {a.note && <p className="mt-1.5 border-l-2 border-border-strong pl-2 text-xs text-fg-muted">{a.note}</p>}
                 </div>
                 <div className="flex shrink-0 gap-1 pl-8 sm:pl-0">
                   {editable(a) && (
                     <Button size="xs" variant="secondary" onClick={() => setEditing(a)}>
-                      Update
+                      {t('common.update')}
                     </Button>
                   )}
                   {admin && a.source === 'manual' && (
-                    <Button size="xs" variant="ghost" aria-label={`Delete action ${a.order}`} onClick={() => setDeleting(a)}>
+                    <Button size="xs" variant="ghost" aria-label={t('detail.deleteActionLabel', { order: a.order })} onClick={() => setDeleting(a)}>
                       <Trash2 aria-hidden />
                     </Button>
                   )}
@@ -238,13 +230,13 @@ function ActionsPanel({ report }: { report: WithId<ReportDoc> }) {
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(o) => !o && setDeleting(null)}
-        title="Delete this action?"
-        description="Manually added actions can be deleted. The deletion is recorded in the audit log."
-        confirmLabel="Delete action"
+        title={t('detail.deleteAction.title')}
+        description={t('detail.deleteAction.desc')}
+        confirmLabel={t('detail.deleteAction.confirm')}
         onConfirm={async () => {
           if (!deleting) return;
           await api.deleteAction(deleting.id);
-          toast.success('Action deleted');
+          toast.success(t('detail.deleteAction.done'));
         }}
       />
     </Panel>
@@ -254,6 +246,7 @@ function ActionsPanel({ report }: { report: WithId<ReportDoc> }) {
 export default function ReportDetail() {
   const { id = '' } = useParams();
   const { can } = useAuth();
+  const { t } = useI18n();
   const admin = can('admin');
   const report = useLive<WithId<ReportDoc> | null>((next, err) => watchReport(id, next, err), [id]);
   const [archiving, setArchiving] = useState(false);
@@ -281,11 +274,11 @@ export default function ReportDetail() {
       <Panel>
         <EmptyState
           icon={<FileX2 />}
-          title="Report not found"
-          description="It may have been removed, or the link is wrong."
+          title={t('detail.notFound')}
+          description={t('detail.notFoundDesc')}
           action={
             <Link to="/app/reports" className={buttonClass({ size: 'sm' })}>
-              Back to reports
+              {t('detail.back')}
             </Link>
           }
         />
@@ -297,7 +290,7 @@ export default function ReportDetail() {
     setRescoring(true);
     try {
       const res = await api.rescoreReport(r.id);
-      toast.success(`Re-scored: ${res.score} (Tier ${res.tier})`);
+      toast.success(t('detail.rescored', { score: res.score, tier: res.tier }));
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
@@ -308,9 +301,9 @@ export default function ReportDetail() {
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      toast.success('Link copied');
+      toast.success(t('detail.linkCopied'));
     } catch {
-      toast.error('Could not copy the link');
+      toast.error(t('detail.linkCopyFailed'));
     }
   };
 
@@ -322,34 +315,42 @@ export default function ReportDetail() {
         eyebrow={
           <span className="flex items-center gap-1.5">
             <Link to="/app/reports" className="hover:text-fg">
-              Reports
+              {t('nav.reports')}
             </Link>
             <span aria-hidden>/</span>
             <span className="font-mono">{r.id.slice(0, 8)}</span>
           </span>
         }
         title={`${r.installationName} · ${r.activityName}`}
-        description={`${SOURCE_LABEL[r.source ?? 'text']} · ${REPORT_TYPE_LABEL[r.type]} · ${r.shift} shift${r.contractor ? ' · Contractor involved' : ''} · Filed ${formatRelative(r.createdAt)}`}
+        description={[
+          t(sourceKey(r.source ?? 'text')),
+          t(reportTypeKey(r.type)),
+          t('reports.shiftLabel', { shift: t(shiftKey(r.shift)) }),
+          r.contractor ? t('detail.contractorInvolved') : null,
+          t('detail.filedAgo', { when: formatRelative(r.createdAt) }),
+        ]
+          .filter(Boolean)
+          .join(' · ')}
         actions={
           <>
             {admin && !r.archived && (
               <Button size="sm" onClick={() => void rescore()} loading={rescoring}>
-                {!rescoring && <RefreshCw aria-hidden />} Re-score
+                {!rescoring && <RefreshCw aria-hidden />} {t('detail.rescore')}
               </Button>
             )}
             <Menu>
               <MenuTrigger asChild>
-                <Button size="icon-sm" variant="secondary" aria-label="More actions">
+                <Button size="icon-sm" variant="secondary" aria-label={t('detail.moreActions')}>
                   <MoreHorizontal aria-hidden />
                 </Button>
               </MenuTrigger>
               <MenuContent>
                 <MenuItem icon={<Copy />} onSelect={() => void copyLink()}>
-                  Copy link
+                  {t('detail.copyLink')}
                 </MenuItem>
                 {admin && !r.archived && (
                   <MenuItem icon={<Archive />} danger onSelect={() => setArchiving(true)}>
-                    Archive report
+                    {t('detail.archive')}
                   </MenuItem>
                 )}
               </MenuContent>
@@ -359,9 +360,9 @@ export default function ReportDetail() {
       />
 
       {r.archived && (
-        <Alert tone="warning" className="mb-4" title="Archived">
-          {r.archiveReason ? `“${r.archiveReason}”` : 'This report is archived.'} {r.archivedAt ? `· ${formatDateTime(r.archivedAt)}` : ''}. It
-          is kept for the record and excluded from the register, counts and charts.
+        <Alert tone="warning" className="mb-4" title={t('reports.view.archived')}>
+          {r.archiveReason ? `“${r.archiveReason}”` : t('detail.archived.plain')} {r.archivedAt ? `· ${formatDateTime(r.archivedAt)}` : ''}.{' '}
+          {t('detail.archived.kept')}
         </Alert>
       )}
 
@@ -372,8 +373,8 @@ export default function ReportDetail() {
               <PanelBody className="flex items-center gap-3">
                 <Loader2 className="size-5 animate-spin text-signal" aria-hidden />
                 <div>
-                  <p className="text-sm font-medium text-fg">Scoring in progress</p>
-                  <p className="text-sm text-fg-muted">The assessment appears here automatically in a few seconds.</p>
+                  <p className="text-sm font-medium text-fg">{t('detail.scoring.title')}</p>
+                  <p className="text-sm text-fg-muted">{t('detail.scoring.desc')}</p>
                 </div>
               </PanelBody>
             </Panel>
@@ -381,16 +382,16 @@ export default function ReportDetail() {
           {r.status === 'failed' && (
             <Alert
               tone="critical"
-              title="Scoring failed"
+              title={t('reports.status.failed')}
               action={
                 admin ? (
                   <Button size="sm" onClick={() => void rescore()} loading={rescoring}>
-                    Retry
+                    {t('common.retry')}
                   </Button>
                 ) : undefined
               }
             >
-              {r.error ?? 'The engine could not assess this report.'} {admin ? '' : 'An administrator can re-run it.'}
+              {r.error ?? t('detail.scoringFailed')} {admin ? '' : t('detail.adminCanRerun')}
             </Alert>
           )}
 
@@ -398,7 +399,7 @@ export default function ReportDetail() {
             <Panel>
               <PanelBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
                 <div className="shrink-0">
-                  <p className="text-xs text-fg-subtle">SIF potential</p>
+                  <p className="text-xs text-fg-subtle">{t('assess.sifPotential')}</p>
                   <p className="text-4xl font-semibold tracking-tight text-fg tabular">
                     {r.score}
                     <span className="text-lg font-normal text-fg-subtle"> / 100</span>
@@ -407,8 +408,8 @@ export default function ReportDetail() {
                 <div className="flex min-w-0 flex-1 flex-col gap-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <TierBadge tier={r.tier} />
-                    {r.escalated && <Badge tone="signal">Rule net applied</Badge>}
-                    <span className="text-xs text-fg-subtle">Respond within {r.responseWindow}</span>
+                    {r.escalated && <Badge tone="signal">{t('detail.ruleNetApplied')}</Badge>}
+                    <span className="text-xs text-fg-subtle">{t('detail.respondWithin', { window: r.responseWindow ?? '' })}</span>
                   </div>
                   <ScoreBar score={r.score!} tier={r.tier!} />
                   <div className="relative h-4 text-2xs text-fg-subtle tabular" aria-hidden>
@@ -421,8 +422,7 @@ export default function ReportDetail() {
               </PanelBody>
               {r.noInjury && (
                 <p className="border-t border-border px-4 py-2.5 text-xs text-fg-muted">
-                  The report records that nobody was hurt. That does not lower the score: potential is judged by what could
-                  have happened, not by the outcome.
+                  {t('detail.noInjury')}
                 </p>
               )}
             </Panel>
@@ -435,12 +435,8 @@ export default function ReportDetail() {
 
           <Panel>
             <PanelHeader
-              title="Narrative"
-              description={
-                r.language
-                  ? `${r.language.primary}${r.language.codeMixed ? ' · code-mixed' : ''}`
-                  : undefined
-              }
+              title={t('detail.narrative')}
+              description={r.language ? `${r.language.primary}${r.language.codeMixed ? ` · ${t('detail.codeMixed')}` : ''}` : undefined}
             />
             <PanelBody className="flex flex-col gap-4">
               <EvidenceText text={r.text} spans={r.evidence} />
@@ -452,7 +448,7 @@ export default function ReportDetail() {
             <>
               <section aria-labelledby="findings" className="flex flex-col gap-3">
                 <h2 id="findings" className="text-sm font-medium text-fg">
-                  Findings
+                  {t('detail.findings')}
                 </h2>
                 <FindingsGrid energy={r.energy} barrier={r.barrier} exposure={r.exposure} />
                 {(r.aggravators?.length || r.mitigators?.length) ? (
@@ -475,7 +471,7 @@ export default function ReportDetail() {
               {r.potentialOutcomes && r.potentialOutcomes.length > 0 && (
                 <section aria-labelledby="outcomes" className="flex flex-col gap-2">
                   <h2 id="outcomes" className="text-sm font-medium text-fg">
-                    What this could have become
+                    {t('detail.couldHaveBecome')}
                   </h2>
                   <PotentialOutcomes outcomes={r.potentialOutcomes} />
                 </section>
@@ -483,7 +479,7 @@ export default function ReportDetail() {
 
               <section aria-labelledby="build" className="flex flex-col gap-2">
                 <h2 id="build" className="text-sm font-medium text-fg">
-                  How the score was built
+                  {t('detail.howBuilt')}
                 </h2>
                 <Contributions items={r.contributions} score={r.score!} />
               </section>
@@ -497,25 +493,25 @@ export default function ReportDetail() {
         <aside className="flex min-w-0 flex-col gap-6">
           <VerdictPanel key={r.verdict?.at?.toMillis?.() ?? 'none'} report={r} />
           <Panel>
-            <PanelHeader title="Details" />
+            <PanelHeader title={t('detail.details')} />
             <PanelBody className="py-1">
               <dl className="divide-y divide-border">
-                <DataRow label="Filed">{formatDateTime(r.createdAt)}</DataRow>
-                <DataRow label="Installation">{r.installationName}</DataRow>
-                <DataRow label="Activity">{r.activityName}</DataRow>
-                <DataRow label="Type">{REPORT_TYPE_LABEL[r.type]}</DataRow>
-                <DataRow label="Shift">{r.shift}</DataRow>
-                <DataRow label="Contractor">{r.contractor ? 'Yes' : 'No'}</DataRow>
-                {r.scoredAt && <DataRow label="Scored">{formatDateTime(r.scoredAt)}</DataRow>}
-                {r.engineVersion && <DataRow label="Engine">v{r.engineVersion}</DataRow>}
-                <DataRow label="Report ID">
+                <DataRow label={t('reports.col.filed')}>{formatDateTime(r.createdAt)}</DataRow>
+                <DataRow label={t('reports.installation')}>{r.installationName}</DataRow>
+                <DataRow label={t('detail.activity')}>{r.activityName}</DataRow>
+                <DataRow label={t('quick.type')}>{t(reportTypeKey(r.type))}</DataRow>
+                <DataRow label={t('detail.shift')}>{t(shiftKey(r.shift))}</DataRow>
+                <DataRow label={t('reports.contractor')}>{r.contractor ? t('common.yes') : t('common.no')}</DataRow>
+                {r.scoredAt && <DataRow label={t('detail.scored')}>{formatDateTime(r.scoredAt)}</DataRow>}
+                {r.engineVersion && <DataRow label={t('detail.engine')}>v{r.engineVersion}</DataRow>}
+                <DataRow label={t('detail.reportId')}>
                   <span className="font-mono text-xs break-all">{r.id}</span>
                 </DataRow>
               </dl>
             </PanelBody>
           </Panel>
           <Panel>
-            <PanelHeader title="Attachments" />
+            <PanelHeader title={t('detail.attachments')} />
             <PanelBody>
               <AttachmentList items={r.attachments ?? []} />
             </PanelBody>
@@ -526,15 +522,15 @@ export default function ReportDetail() {
       <ConfirmDialog
         open={archiving}
         onOpenChange={setArchiving}
-        title="Archive this report?"
-        description="It leaves the register, counts and charts, and its open corrective actions are cancelled. The report itself is kept for the record — nothing is deleted."
-        confirmLabel="Archive report"
-        reasonLabel="Reason"
-        reasonHint="Recorded in the audit log, e.g. Duplicate of an earlier report."
+        title={t('detail.archive.title')}
+        description={t('detail.archive.desc')}
+        confirmLabel={t('detail.archive')}
+        reasonLabel={t('detail.archive.reason')}
+        reasonHint={t('detail.archive.reasonHint')}
         onConfirm={async (reason) => {
           const res = await api.archiveReport({ reportId: r.id, reason });
-          toast.success('Report archived', {
-            description: res.actionsCancelled ? `${res.actionsCancelled} open action(s) cancelled.` : undefined,
+          toast.success(t('detail.archive.done'), {
+            description: res.actionsCancelled ? t('detail.archive.cancelled', { count: res.actionsCancelled }) : undefined,
           });
         }}
       />

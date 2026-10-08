@@ -50,6 +50,10 @@ function storedLang(): Lang {
 // The active dictionary also lives outside React, so plain modules (error
 // messages, services) can translate without a hook.
 let active: Dictionary = en;
+let activeLang: Lang = storedLang();
+
+/** The interface language right now, for code outside React (date and number formats). */
+export const currentLang = (): Lang => activeLang;
 
 function format(template: string, vars?: Vars): string {
   return vars ? template.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole)) : template;
@@ -83,6 +87,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    activeLang = lang;
     document.documentElement.lang = lang;
     if (lang === 'en') {
       active = en;

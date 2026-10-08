@@ -7,6 +7,7 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowUpRight, ChevronDown } from 'lucide-react';
 
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
@@ -153,6 +154,7 @@ export function CardStack({
   onOpen: (id: string) => void;
   caption: string;
 }) {
+  const { t } = useI18n();
   const behind = others.slice(0, 3).reverse();
   return (
     <div>
@@ -163,7 +165,7 @@ export function CardStack({
               key={it.id}
               type="button"
               onClick={() => onOpen(it.id)}
-              aria-label={`${it.name}: peak ${it.peak}`}
+              aria-label={t('dash.peak', { name: it.name, peak: it.peak })}
               className={cn(
                 'absolute inset-x-0 flex h-14 cursor-pointer items-start rounded-[14px] px-4 pt-[8px] text-left leading-none shadow-[0_-6px_16px_-8px_rgb(0_0_0/0.6)] transition-transform hover:-translate-y-0.5',
                 STACK_COLORS[(STACK_COLORS.length - behind.length + i) % STACK_COLORS.length],
@@ -187,7 +189,7 @@ export function CardStack({
         <div className="mt-4 flex items-end justify-between gap-3 text-sm">
           <span className="truncate text-white/85">
             {lead.code ? `${lead.code} · ` : ''}
-            {lead.count} {lead.count === 1 ? 'report' : 'reports'}
+            {t(lead.count === 1 ? 'dash.reportCount.one' : 'dash.reportCount.many', { count: lead.count })}
           </span>
           <span className="shrink-0 font-mono text-base font-semibold tabular">{lead.peak}</span>
         </div>

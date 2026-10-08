@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/dialog';
 import { Alert } from '@/components/ui/feedback';
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
+import { useI18n } from '@/i18n';
+import { actionStatusKey } from '@/i18n/labels';
 import { errorMessage } from '@/lib/errors';
 import { daysUntil, formatDate } from '@/lib/format';
 import { api } from '@/services/callables';
-import { ACTION_STATUS_LABEL, ACTION_STATUSES, LIMITS, type ActionStatus } from '@/shared/constants';
+import { ACTION_STATUSES, LIMITS, type ActionStatus } from '@/shared/constants';
 import { actionFieldsSchema } from '@/shared/schemas';
 import type { ActionDoc, WithId } from '@/shared/types';
 
@@ -28,6 +30,7 @@ export function CreateActionDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const {
     register,
@@ -50,7 +53,7 @@ export function CreateActionDialog({
     setError(null);
     try {
       await api.createAction({ ...v, reportId });
-      toast.success('Corrective action added');
+      toast.success(t('action.added'));
       onOpenChange(false);
     } catch (err) {
       setError(errorMessage(err));
@@ -61,33 +64,33 @@ export function CreateActionDialog({
     <Modal
       open={open}
       onOpenChange={(o) => !isSubmitting && onOpenChange(o)}
-      title="Add corrective action"
-      description="A control that removes or reduces the hazard in this report."
+      title={t('action.add.title')}
+      description={t('action.add.desc')}
       onSubmit={submit}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" variant="primary" loading={isSubmitting}>
-            Add action
+            {t('detail.addAction')}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
         {error && <Alert tone="critical">{error}</Alert>}
-        <Field label="Control" error={errors.control?.message}>
-          <Input autoFocus placeholder="e.g. Install toe boards on all lifts above 2 m" {...register('control')} />
+        <Field label={t('action.control')} error={errors.control?.message}>
+          <Input autoFocus placeholder={t('action.controlPlaceholder')} {...register('control')} />
         </Field>
-        <Field label="Rationale" optional error={errors.rationale?.message}>
+        <Field label={t('action.rationale')} optional error={errors.rationale?.message}>
           <Textarea rows={3} maxLength={LIMITS.noteMax} {...register('rationale')} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Owner" error={errors.owner?.message} hint="A role or team, e.g. Maintenance supervisor">
+          <Field label={t('action.owner')} error={errors.owner?.message} hint={t('action.ownerHint')}>
             <Input {...register('owner')} />
           </Field>
-          <Field label="Due in (days)" error={errors.dueInDays?.message}>
+          <Field label={t('action.dueInDays')} error={errors.dueInDays?.message}>
             <Input type="number" min={1} max={365} inputMode="numeric" {...register('dueInDays')} />
           </Field>
         </div>
@@ -120,6 +123,7 @@ export function EditActionDialog({
   onSaved?: () => void;
 }) {
   const { can } = useAuth();
+  const { t } = useI18n();
   const officer = can('hse-officer');
   const [error, setError] = useState<string | null>(null);
   const {
@@ -150,7 +154,7 @@ export function EditActionDialog({
     }
     try {
       await api.updateAction(patch);
-      toast.success('Action updated');
+      toast.success(t('action.updated'));
       onSaved?.();
       onOpenChange(false);
     } catch (err) {
@@ -165,16 +169,16 @@ export function EditActionDialog({
     <Modal
       open={Boolean(action)}
       onOpenChange={(o) => !isSubmitting && onOpenChange(o)}
-      title="Update corrective action"
+      title={t('action.update.title')}
       description={action?.control}
       onSubmit={submit}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" variant="primary" loading={isSubmitting} disabled={!isDirty}>
-            Save changes
+            {t('action.saveChanges')}
           </Button>
         </>
       }
@@ -184,28 +188,28 @@ export function EditActionDialog({
           {error && <Alert tone="critical">{error}</Alert>}
           {action.rationale && <p className="text-sm text-fg-muted">{action.rationale}</p>}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Status" error={errors.status?.message}>
+            <Field label={t('action.status')} error={errors.status?.message}>
               <Select {...register('status')}>
                 {statuses.map((s) => (
                   <option key={s} value={s}>
-                    {ACTION_STATUS_LABEL[s]}
+                    {t(actionStatusKey(s))}
                   </option>
                 ))}
               </Select>
             </Field>
-            <Field label="Owner" error={errors.owner?.message} hint={officer ? undefined : 'Only an HSE officer can reassign.'}>
+            <Field label={t('action.owner')} error={errors.owner?.message} hint={officer ? undefined : t('action.onlyOfficerReassign')}>
               <Input {...register('owner')} readOnly={!officer} className={officer ? undefined : 'opacity-60'} />
             </Field>
           </div>
           <Field
-            label="Reschedule"
+            label={t('action.reschedule')}
             optional
             error={errors.reschedule?.message}
-            hint={`Due ${formatDate(action.dueAt)}${due !== null ? (due < 0 ? ` · ${-due} days overdue` : ` · in ${due} days`) : ''}. Enter a number of days from today to change it.`}
+            hint={`${t('detail.due', { date: formatDate(action.dueAt) })}${due !== null ? (due < 0 ? ` · ${t('action.daysOverdue', { days: -due })}` : ` · ${t('action.inDays', { days: due })}`) : ''}. ${t('action.rescheduleHint')}`}
           >
-            <Input type="number" min={1} max={365} inputMode="numeric" placeholder="Days from today" {...register('reschedule')} readOnly={!officer} className={officer ? undefined : 'opacity-60'} />
+            <Input type="number" min={1} max={365} inputMode="numeric" placeholder={t('action.daysFromToday')} {...register('reschedule')} readOnly={!officer} className={officer ? undefined : 'opacity-60'} />
           </Field>
-          <Field label="Progress note" optional error={errors.note?.message}>
+          <Field label={t('action.progressNote')} optional error={errors.note?.message}>
             <Textarea rows={3} maxLength={LIMITS.noteMax} {...register('note')} />
           </Field>
         </div>

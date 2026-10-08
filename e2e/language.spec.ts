@@ -41,4 +41,34 @@ test.describe('interface language', () => {
     await page.getByRole('main').getByRole('combobox', { name: 'ভাষা' }).selectOption('en');
     await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Dashboard' })).toBeVisible();
   });
+
+  test('screens are translated; reports stay exactly as they were written', async ({ page }) => {
+    await signIn(page, 'officer');
+    await page.goto('/app/reports');
+    const firstReport = page.getByRole('row').nth(1).getByRole('link');
+    await expect(firstReport).toBeVisible();
+    const written = await firstReport.innerText();
+
+    await page.goto('/app/settings');
+    await page.getByRole('main').getByRole('combobox', { name: 'Language' }).selectOption('hi');
+    await expect(page.getByRole('heading', { level: 1, name: 'सेटिंग्स' })).toBeVisible();
+
+    // The register: headings, filters and columns in Hindi, the report text untouched.
+    await page.goto('/app/reports');
+    await expect(page.getByRole('heading', { level: 1, name: 'रिपोर्टें' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'स्कोर' })).toBeVisible();
+    await expect(page.getByRole('row').nth(1).getByRole('link')).toHaveText(written);
+
+    // A report: panels in Hindi, the narrative as written.
+    await page.getByRole('row').nth(1).getByRole('link').click();
+    await expect(page.getByRole('heading', { name: 'अधिकारी की समीक्षा' })).toBeVisible();
+    await expect(page.getByText(written).first()).toBeVisible();
+
+    // The worker's quick report and the dashboard.
+    await page.goto('/app/report');
+    await expect(page.getByRole('heading', { level: 1, name: 'खतरे की रिपोर्ट करें' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'रिपोर्ट भेजें' })).toBeVisible();
+    await page.goto('/app');
+    await expect(page.getByRole('heading', { level: 1, name: 'मेरा डैशबोर्ड' })).toBeVisible();
+  });
 });
