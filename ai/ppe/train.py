@@ -110,7 +110,27 @@ def main() -> None:
         help="cap PyTorch's GPU memory pool. On Windows every GPU allocation is also charged to the system "
         "commit (RAM + page file), so on a small laptop this keeps training inside the memory budget",
     )
+    ap.add_argument(
+        "--set",
+        nargs="*",
+        default=[],
+        metavar="KEY=VALUE",
+        help="extra Ultralytics training settings, e.g. --set lr0=0.003 cos_lr=True close_mosaic=15 "
+        "(fine-tuning from an earlier run: --model <run>/weights/best.pt with a lower lr0)",
+    )
     args = ap.parse_args()
+
+    import ast
+
+    extra: dict[str, object] = {}
+    for item in args.set:
+        key, sep, value = item.partition("=")
+        if not sep or not key:
+            raise SystemExit(f"--set {item}: use KEY=VALUE")
+        try:
+            extra[key] = ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            extra[key] = value  # a plain word, e.g. optimizer=AdamW
 
     start_memory_guard(args.guard_commit_gb, args.guard_disk_gb)
     configure_ultralytics()
@@ -168,6 +188,7 @@ def main() -> None:
         deterministic=False,  # deterministic CUDA kernels cost extra memory
         cache=False,  # 8 GB RAM: read images from disk
         plots=False,  # plots are memory-hungry; metrics are recorded by evaluate.py
+        **extra,
     )
     best = RUNS / args.name / "weights" / "best.pt"
     print(f"\nBest weights: {best}")
