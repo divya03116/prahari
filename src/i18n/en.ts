@@ -608,6 +608,21 @@ export const en = {
   'crash.reloadNew': 'Reload to continue with the latest version.',
   'crash.desc': 'This screen hit an unexpected error. Reloading usually fixes it.',
   'crash.reload': 'Reload',
+
+  // ------------------------------------------------------------------ PDF export
+  'pdf.export': 'Export PDF',
+  'pdf.docTitle': 'Safety observation report',
+  'pdf.generated': 'Generated {when}',
+  'pdf.assessment': 'Assessment',
+  'pdf.notScored': 'This report has not been scored yet.',
+  'pdf.asWritten': 'Shown exactly as written.',
+  'pdf.contextFactors': 'Context factors',
+  'pdf.factor': 'Factor',
+  'pdf.points': 'Points',
+  'pdf.evidence': 'Evidence',
+  'pdf.detected': 'Detected',
+  'pdf.disclaimer':
+    'Decision support only. The score estimates the potential for serious injury from what the report describes; it is not a prediction and does not replace a competent person’s judgement. The reporter’s identity is not part of this document.',
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof en;

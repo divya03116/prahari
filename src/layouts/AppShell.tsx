@@ -184,19 +184,19 @@ export function AppShell() {
   useEffect(() => setOpen(false), [location.pathname]);
 
   return (
-    <div className="min-h-dvh lg:pl-60">
+    <div className="min-h-dvh lg:pl-60 print:min-h-0 print:pl-0">
       <a
         href="#main"
-        className="sr-only z-50 rounded-md bg-surface-3 px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+        className="sr-only z-50 rounded-md bg-surface-3 px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3 print:hidden"
       >
         {t('nav.skip')}
       </a>
 
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-border bg-surface lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-border bg-surface lg:block print:hidden">
         <SidebarContents />
       </aside>
 
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-canvas/95 px-4 backdrop-blur-sm lg:hidden">
+      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-canvas/95 px-4 backdrop-blur-sm lg:hidden print:hidden">
         <D.Root open={open} onOpenChange={setOpen}>
           <D.Trigger asChild>
             <Button variant="ghost" size="icon" aria-label={t('nav.open')} className="-ml-2">
@@ -226,7 +226,7 @@ export function AppShell() {
         </Link>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <main id="main" className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8 print:max-w-none print:p-0">
         <Outlet />
       </main>
     </div>
