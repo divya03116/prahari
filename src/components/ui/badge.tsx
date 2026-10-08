@@ -1,16 +1,9 @@
 import type { ReactNode } from 'react';
 
+import { useI18n } from '@/i18n';
+import { actionStatusKey, roleKey, tierKey, verdictKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
-import {
-  ACTION_STATUS_LABEL,
-  ROLE_LABEL,
-  TIER_LABEL,
-  VERDICT_LABEL,
-  type ActionStatus,
-  type Role,
-  type Tier,
-  type Verdict,
-} from '@/shared/constants';
+import type { ActionStatus, Role, Tier, Verdict } from '@/shared/constants';
 
 export type Tone = 'neutral' | 'critical' | 'warning' | 'success' | 'info' | 'signal';
 
@@ -63,10 +56,11 @@ export function Badge({
 export const TIER_TONE: Record<Tier, Tone> = { 1: 'critical', 2: 'warning', 3: 'success' };
 
 export function TierBadge({ tier, compact = false }: { tier: Tier | undefined; compact?: boolean }) {
-  if (!tier) return <Badge>Unscored</Badge>;
+  const { t } = useI18n();
+  if (!tier) return <Badge>{t('tier.unscored')}</Badge>;
   return (
     <Badge tone={TIER_TONE[tier]} dot>
-      {compact ? `T${tier}` : `Tier ${tier} · ${TIER_LABEL[tier]}`}
+      {compact ? `T${tier}` : t('tier.label', { tier, label: t(tierKey(tier)) })}
     </Badge>
   );
 }
@@ -79,9 +73,10 @@ const ACTION_TONE: Record<ActionStatus, Tone> = {
 };
 
 export function ActionStatusBadge({ status }: { status: ActionStatus }) {
+  const { t } = useI18n();
   return (
     <Badge tone={ACTION_TONE[status]} dot>
-      {ACTION_STATUS_LABEL[status]}
+      {t(actionStatusKey(status))}
     </Badge>
   );
 }
@@ -94,7 +89,8 @@ const VERDICT_TONE: Record<Verdict, Tone> = {
 };
 
 export function VerdictBadge({ verdict }: { verdict: Verdict }) {
-  return <Badge tone={VERDICT_TONE[verdict]}>{VERDICT_LABEL[verdict]}</Badge>;
+  const { t } = useI18n();
+  return <Badge tone={VERDICT_TONE[verdict]}>{t(verdictKey(verdict))}</Badge>;
 }
 
 const ROLE_TONE: Record<Role, Tone> = {
@@ -105,5 +101,6 @@ const ROLE_TONE: Record<Role, Tone> = {
 };
 
 export function RoleBadge({ role }: { role: Role }) {
-  return <Badge tone={ROLE_TONE[role]}>{ROLE_LABEL[role]}</Badge>;
+  const { t } = useI18n();
+  return <Badge tone={ROLE_TONE[role]}>{t(roleKey(role))}</Badge>;
 }

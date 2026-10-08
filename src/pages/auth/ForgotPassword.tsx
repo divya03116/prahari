@@ -8,6 +8,7 @@ import { MailCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/feedback';
 import { Field, Input } from '@/components/ui/field';
+import { rich, useI18n } from '@/i18n';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { errorMessage } from '@/lib/errors';
 import { requestPasswordReset } from '@/services/auth';
@@ -18,6 +19,7 @@ const schema = z.object({ email: emailSchema });
 export default function ForgotPassword() {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
   const {
     register,
     handleSubmit,
@@ -38,12 +40,11 @@ export default function ForgotPassword() {
 
   if (sentTo) {
     return (
-      <AuthLayout title="Check your email" footer={<Link to="/signin" className="font-medium text-fg hover:underline">Back to sign in</Link>}>
+      <AuthLayout title={t('auth.checkEmail')} footer={<Link to="/signin" className="font-medium text-fg hover:underline">{t('auth.backToSignIn')}</Link>}>
         <div className="flex gap-3 rounded-md border border-border bg-surface p-4">
           <MailCheck className="mt-0.5 size-5 shrink-0 text-success" aria-hidden />
           <p className="text-sm text-fg-muted">
-            If an account exists for <span className="font-medium text-fg">{sentTo}</span>, a link to reset the password
-            is on its way. It expires in one hour.
+            {rich(t('auth.resetSent'), { email: <span className="font-medium text-fg">{sentTo}</span> })}
           </p>
         </div>
       </AuthLayout>
@@ -52,21 +53,21 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout
-      title="Reset your password"
-      description="Enter the email address on your account and we will send you a reset link."
+      title={t('auth.reset.title')}
+      description={t('auth.reset.description')}
       footer={
         <Link to="/signin" className="font-medium text-fg hover:underline">
-          Back to sign in
+          {t('auth.backToSignIn')}
         </Link>
       }
     >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {error && <Alert tone="critical">{error}</Alert>}
-        <Field label="Email" error={errors.email?.message}>
+        <Field label={t('auth.email')} error={errors.email?.message}>
           <Input type="email" autoComplete="email" autoFocus className="h-9" {...register('email')} />
         </Field>
         <Button type="submit" variant="primary" size="lg" loading={isSubmitting} className="w-full">
-          Send reset link
+          {t('auth.sendResetLink')}
         </Button>
       </form>
     </AuthLayout>

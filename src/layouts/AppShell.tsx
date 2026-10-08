@@ -22,37 +22,40 @@ import { toast } from 'sonner';
 
 import { useAuth, useDisplayName } from '@/auth/AuthProvider';
 import { LogoMark } from '@/components/brand';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Badge, RoleBadge } from '@/components/ui/badge';
 import { Button, buttonClass } from '@/components/ui/button';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
 import { Avatar } from '@/components/ui/misc';
 import { cn } from '@/lib/cn';
+import { useI18n, type MessageKey } from '@/i18n';
+import { roleKey } from '@/i18n/labels';
 import { usingEmulators } from '@/lib/firebase';
-import { ROLE_LABEL } from '@/shared/constants';
 
 interface NavEntry {
   to: string;
-  label: string;
+  label: MessageKey;
   icon: ReactNode;
   end?: boolean;
 }
 
 const WORKSPACE: NavEntry[] = [
-  { to: '/app', label: 'Dashboard', icon: <LayoutGrid />, end: true },
-  { to: '/app/report', label: 'Report a hazard', icon: <Mic /> },
-  { to: '/app/reports', label: 'Reports', icon: <FileText /> },
-  { to: '/app/monitoring', label: 'Live monitoring', icon: <Cctv /> },
-  { to: '/app/actions', label: 'Corrective actions', icon: <ClipboardCheck /> },
-  { to: '/app/insights', label: 'Insights', icon: <LineChart /> },
+  { to: '/app', label: 'nav.dashboard', icon: <LayoutGrid />, end: true },
+  { to: '/app/report', label: 'nav.report', icon: <Mic /> },
+  { to: '/app/reports', label: 'nav.reports', icon: <FileText /> },
+  { to: '/app/monitoring', label: 'nav.monitoring', icon: <Cctv /> },
+  { to: '/app/actions', label: 'nav.actions', icon: <ClipboardCheck /> },
+  { to: '/app/insights', label: 'nav.insights', icon: <LineChart /> },
 ];
 
 const ADMIN: NavEntry[] = [
-  { to: '/app/admin/users', label: 'Users & roles', icon: <Users /> },
-  { to: '/app/admin/reference', label: 'Reference data', icon: <Building2 /> },
-  { to: '/app/admin/audit', label: 'Audit log', icon: <ScrollText /> },
+  { to: '/app/admin/users', label: 'nav.users', icon: <Users /> },
+  { to: '/app/admin/reference', label: 'nav.reference', icon: <Building2 /> },
+  { to: '/app/admin/audit', label: 'nav.audit', icon: <ScrollText /> },
 ];
 
 function NavItem({ entry, onNavigate }: { entry: NavEntry; onNavigate?: () => void }) {
+  const { t } = useI18n();
   return (
     <NavLink
       to={entry.to}
@@ -71,7 +74,7 @@ function NavItem({ entry, onNavigate }: { entry: NavEntry; onNavigate?: () => vo
         <>
           {isActive && <span aria-hidden className="absolute top-1.5 bottom-1.5 -left-3 w-0.5 rounded-full bg-signal" />}
           {entry.icon}
-          <span className="truncate">{entry.label}</span>
+          <span className="truncate">{t(entry.label)}</span>
         </>
       )}
     </NavLink>
@@ -82,10 +85,11 @@ function UserMenu() {
   const { user, role, signOut } = useAuth();
   const name = useDisplayName();
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const out = async () => {
     await signOut();
-    toast.success('Signed out');
+    toast.success(t('nav.signedOut'));
     navigate('/signin', { replace: true });
   };
 
@@ -95,18 +99,18 @@ function UserMenu() {
         <button
           type="button"
           className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-2"
-          aria-label="Account menu"
+          aria-label={t('nav.accountMenu')}
         >
           <Avatar name={name} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-fg">{name}</span>
-            <span className="block truncate text-xs text-fg-subtle">{ROLE_LABEL[role]}</span>
+            <span className="block truncate text-xs text-fg-subtle">{t(roleKey(role))}</span>
           </span>
           <ChevronsUpDown className="size-4 shrink-0 text-fg-subtle" aria-hidden />
         </button>
       </MenuTrigger>
       <MenuContent align="start" className="w-60">
-        <MenuLabel>Signed in as</MenuLabel>
+        <MenuLabel>{t('nav.signedInAs')}</MenuLabel>
         <div className="px-2 pb-2">
           <p className="truncate text-sm text-fg">{user?.email}</p>
           <div className="mt-1.5">
@@ -115,10 +119,10 @@ function UserMenu() {
         </div>
         <MenuSeparator />
         <MenuItem icon={<Settings />} onSelect={() => navigate('/app/settings')}>
-          Settings
+          {t('nav.settings')}
         </MenuItem>
         <MenuItem icon={<LogOut />} onSelect={() => void out()}>
-          Sign out
+          {t('nav.signOut')}
         </MenuItem>
       </MenuContent>
     </Menu>
@@ -127,6 +131,7 @@ function UserMenu() {
 
 function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
   const { can } = useAuth();
+  const { t } = useI18n();
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-14 items-center gap-2 px-4">
@@ -135,19 +140,19 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
           <span className="text-sm font-semibold tracking-[0.14em]">PRAHARI</span>
         </Link>
         {usingEmulators && (
-          <Badge tone="info" className="ml-auto" title="Connected to the local Firebase emulators">
-            Local
+          <Badge tone="info" className="ml-auto" title={t('nav.localBadgeTitle')}>
+            {t('nav.localBadge')}
           </Badge>
         )}
       </div>
 
       <div className="px-3 pb-2">
         <Link to="/app/reports/new" onClick={onNavigate} className={buttonClass({ variant: 'secondary', className: 'w-full justify-start' })}>
-          <Plus aria-hidden /> New report
+          <Plus aria-hidden /> {t('nav.newReport')}
         </Link>
       </div>
 
-      <nav aria-label="Main" className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-2">
+      <nav aria-label={t('nav.main')} className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-2">
         <div className="flex flex-col gap-0.5">
           {WORKSPACE.map((e) => (
             <NavItem key={e.to} entry={e} onNavigate={onNavigate} />
@@ -155,7 +160,7 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         </div>
         {can('admin') && (
           <div className="flex flex-col gap-0.5">
-            <p className="px-2.5 pb-1 text-2xs font-medium tracking-wide text-fg-subtle uppercase">Administration</p>
+            <p className="px-2.5 pb-1 text-2xs font-medium tracking-wide text-fg-subtle uppercase">{t('nav.administration')}</p>
             {ADMIN.map((e) => (
               <NavItem key={e.to} entry={e} onNavigate={onNavigate} />
             ))}
@@ -163,7 +168,8 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         )}
       </nav>
 
-      <div className="border-t border-border p-2">
+      <div className="flex flex-col gap-1.5 border-t border-border p-2">
+        <LanguageSwitcher compact className="mx-1 self-start" />
         <UserMenu />
       </div>
     </div>
@@ -173,6 +179,7 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const { t } = useI18n();
 
   useEffect(() => setOpen(false), [location.pathname]);
 
@@ -182,7 +189,7 @@ export function AppShell() {
         href="#main"
         className="sr-only z-50 rounded-md bg-surface-3 px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >
-        Skip to content
+        {t('nav.skip')}
       </a>
 
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-border bg-surface lg:block">
@@ -192,17 +199,17 @@ export function AppShell() {
       <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-canvas/95 px-4 backdrop-blur-sm lg:hidden">
         <D.Root open={open} onOpenChange={setOpen}>
           <D.Trigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Open navigation" className="-ml-2">
+            <Button variant="ghost" size="icon" aria-label={t('nav.open')} className="-ml-2">
               <MenuIcon aria-hidden />
             </Button>
           </D.Trigger>
           <D.Portal>
             <D.Overlay className="fixed inset-0 z-40 bg-black/60 data-[state=open]:animate-fade-in lg:hidden" />
             <D.Content className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] border-r border-border bg-surface data-[state=open]:animate-slide-in-left focus:outline-none lg:hidden">
-              <D.Title className="sr-only">Navigation</D.Title>
-              <D.Description className="sr-only">Main navigation</D.Description>
+              <D.Title className="sr-only">{t('nav.title')}</D.Title>
+              <D.Description className="sr-only">{t('nav.mainDescription')}</D.Description>
               <D.Close asChild>
-                <Button variant="ghost" size="icon-sm" aria-label="Close navigation" className="absolute top-3.5 right-3">
+                <Button variant="ghost" size="icon-sm" aria-label={t('nav.close')} className="absolute top-3.5 right-3">
                   <X aria-hidden />
                 </Button>
               </D.Close>
@@ -215,7 +222,7 @@ export function AppShell() {
           <span className="text-sm font-semibold tracking-[0.14em]">PRAHARI</span>
         </Link>
         <Link to="/app/reports/new" className={buttonClass({ variant: 'secondary', size: 'sm', className: 'ml-auto' })}>
-          <Plus aria-hidden /> New
+          <Plus aria-hidden /> {t('nav.new')}
         </Link>
       </header>
 

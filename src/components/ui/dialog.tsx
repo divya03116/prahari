@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import * as D from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { Button, type ButtonVariant } from './button';
@@ -32,6 +33,7 @@ export function Modal({
   /** When given, the body and footer are wrapped in a <form>, so Enter submits. */
   onSubmit?: (e: FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t } = useI18n();
   const width = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' }[size];
   const inner = (
     <>
@@ -61,7 +63,7 @@ export function Modal({
               )}
             </div>
             <D.Close asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="Close" className="-mt-1 -mr-2">
+              <Button variant="ghost" size="icon-sm" aria-label={t('common.close')} className="-mt-1 -mr-2">
                 <X aria-hidden />
               </Button>
             </D.Close>
@@ -90,7 +92,7 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   variant = 'danger',
   reasonLabel,
   reasonHint,
@@ -106,6 +108,7 @@ export function ConfirmDialog({
   reasonHint?: string;
   onConfirm: (reason: string) => Promise<unknown> | void;
 }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState('');
@@ -123,7 +126,7 @@ export function ConfirmDialog({
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (reasonInvalid) {
-      setError(`${reasonLabel} must be at least 3 characters.`);
+      setError(t('common.reasonTooShort', { label: reasonLabel ?? '' }));
       return;
     }
     setBusy(true);
@@ -150,10 +153,10 @@ export function ConfirmDialog({
       footer={
         <>
           <Button variant="ghost" onClick={() => change(false)} disabled={busy}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" variant={variant} loading={busy}>
-            {confirmLabel}
+            {confirmLabel ?? t('common.confirm')}
           </Button>
         </>
       }
