@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 interface HostingHeader {
   key: string;
@@ -36,10 +37,41 @@ function hostingHeaders(useEmulators: boolean): Record<string, string> {
   return out;
 }
 
+/**
+ * Emits /sw.js from src/pwa/sw.js, filling in the files to keep for offline
+ * use: everything the build produced except the large, rarely needed ones
+ * (video, model runtimes), which are fetched when used. The cache name is a
+ * hash of that list and of index.html, so every build gets its own cache.
+ */
+function serviceWorker(): Plugin {
+  const SKIP = /\.(map|mp4|wasm|onnx)$/;
+  const PUBLIC = ['/manifest.webmanifest', '/favicon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
+  return {
+    name: 'prahari-service-worker',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const built = Object.values(bundle)
+        .filter((f) => !SKIP.test(f.fileName) && f.fileName !== 'index.html')
+        .filter((f) => (f.type === 'chunk' ? f.code.length : f.source.length) < 1_500_000)
+        .map((f) => `/${f.fileName}`)
+        .sort();
+      const precache = [...built, ...PUBLIC];
+      const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+      const version = createHash('sha256').update(precache.join('\n')).update(html).digest('hex').slice(0, 12);
+      const template = readFileSync(new URL('./src/pwa/sw.js', import.meta.url), 'utf8');
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sw.js',
+        source: template.replace('__VERSION__', version).replace('__PRECACHE__', JSON.stringify(precache, null, 2)),
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), serviceWorker()],
     resolve: {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
     },

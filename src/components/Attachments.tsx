@@ -6,6 +6,7 @@ import { rich, useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { formatBytes } from '@/lib/format';
+import { isConnectionError, type QueuedFile } from '@/offline/outbox';
 import { attachmentPath, attachmentUrl, removeUpload, startUpload, validateFile } from '@/services/storage';
 import { LIMITS } from '@/shared/constants';
 import type { AttachmentMeta } from '@/shared/types';
@@ -17,8 +18,17 @@ export interface UploadItem {
   contentType: string;
   path: string;
   progress: number;
-  state: 'uploading' | 'done' | 'error';
+  /** 'queued': chosen without a connection; kept on the device and uploaded with the report. */
+  state: 'uploading' | 'done' | 'error' | 'queued';
   error?: string;
+  file?: File;
+}
+
+/** Files still on the device, in the form the outbox keeps them. */
+export function waitingFiles(items: UploadItem[]): QueuedFile[] {
+  return items
+    .filter((u) => u.state === 'queued' && u.file)
+    .map((u) => ({ path: u.path, name: u.name, size: u.size, contentType: u.contentType, blob: u.file as Blob }));
 }
 
 /**
@@ -74,6 +84,13 @@ export function AttachmentPicker({
       }
       const path = attachmentPath(uid, reportId, file);
       const key = path;
+      const failed = (err: unknown) =>
+        patch(key, isConnectionError(err) ? { state: 'queued', file } : { state: 'error', error: errorMessage(err) });
+      if (!navigator.onLine) {
+        setItems((list) => [...list, { key, name: file.name, size: file.size, contentType: file.type, path, progress: 0, state: 'queued', file }]);
+        onFile?.(file);
+        continue;
+      }
       setItems((list) => [
         ...list,
         { key, name: file.name, size: file.size, contentType: file.type, path, progress: 0, state: 'uploading' },
@@ -83,11 +100,11 @@ export function AttachmentPicker({
           task.on(
             'state_changed',
             (s) => patch(key, { progress: s.totalBytes ? s.bytesTransferred / s.totalBytes : 0 }),
-            (err) => patch(key, { state: 'error', error: errorMessage(err) }),
+            failed,
             () => patch(key, { state: 'done', progress: 1 }),
           ),
         )
-        .catch((err) => patch(key, { state: 'error', error: errorMessage(err) }));
+        .catch(failed);
       onFile?.(file);
     }
     setRejects(errs);
@@ -194,6 +211,8 @@ export function AttachmentPicker({
                   </div>
                 ) : i.state === 'error' ? (
                   <p className="text-xs text-critical">{i.error}</p>
+                ) : i.state === 'queued' ? (
+                  <p className="text-xs text-warning">{t('attach.queued', { size: formatBytes(i.size) })}</p>
                 ) : (
                   <p className="text-xs text-fg-subtle">{t('attach.uploaded', { size: formatBytes(i.size) })}</p>
                 )}
