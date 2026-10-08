@@ -189,3 +189,297 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ==================================================================
+ * Paper. "Export PDF" and Ctrl+P print one thing: the .print-doc
+ * document (components/ReportPrint.tsx) — light, A4, no controls. The
+ * dark, interactive screen UI is marked print:hidden and stays out.
+ * ================================================================== */
+.print-doc {
+  display: none;
+}
+
+@page {
+  size: A4;
+  margin: 14mm 13mm 16mm;
+
+  @bottom-right {
+    content: counter(page) ' / ' counter(pages);
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 8pt;
+    color: #6b7280;
+  }
+}
+
+@media print {
+  html {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  /* Toasts and anything else floating above the page. */
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+
+  .print-doc {
+    display: block;
+    font-size: 9.5pt;
+    line-height: 1.45;
+    color: #111827;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-doc p {
+    margin: 0;
+  }
+
+  .pd-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16pt;
+    border-bottom: 1.5pt solid #111827;
+    padding-bottom: 8pt;
+  }
+
+  .pd-brand {
+    display: flex;
+    align-items: center;
+    gap: 5pt;
+    font-size: 10pt;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+  }
+
+  .pd-brand svg {
+    width: 13pt;
+    height: 13pt;
+  }
+
+  .pd-title {
+    margin: 5pt 0 1pt;
+    font-size: 17pt;
+    line-height: 1.2;
+    font-weight: 700;
+  }
+
+  .pd-headmeta {
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 8pt;
+    color: #4b5563;
+  }
+
+  .pd-mono {
+    font-family: var(--font-mono);
+  }
+
+  .pd-section {
+    margin-top: 13pt;
+  }
+
+  .pd-keep {
+    break-inside: avoid;
+  }
+
+  .pd-h2 {
+    margin: 0 0 6pt;
+    border-bottom: 0.75pt solid #d1d5db;
+    padding-bottom: 3pt;
+    font-size: 10.5pt;
+    font-weight: 700;
+    break-after: avoid;
+  }
+
+  .pd-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7pt 14pt;
+  }
+
+  .pd-cols {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12pt;
+  }
+
+  .pd-k {
+    font-size: 7.5pt;
+    color: #6b7280;
+  }
+
+  .pd-v {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .pd-strong {
+    font-weight: 600;
+  }
+
+  .pd-muted {
+    color: #6b7280;
+  }
+
+  .pd-small {
+    margin-top: 3pt !important;
+    font-size: 8pt;
+  }
+
+  .pd-block {
+    display: block;
+  }
+
+  .pd-nowrap {
+    white-space: nowrap;
+  }
+
+  .pd-score {
+    display: flex;
+    align-items: center;
+    gap: 18pt;
+    border: 0.75pt solid #d1d5db;
+    border-radius: 6pt;
+    padding: 9pt 12pt;
+  }
+
+  .pd-score-num {
+    font-size: 30pt;
+    line-height: 1.1;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .pd-score-of {
+    font-size: 11pt;
+    font-weight: 400;
+    color: #6b7280;
+  }
+
+  .pd-score-body {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 6pt;
+  }
+
+  .pd-tier {
+    display: inline-block;
+    border-radius: 99pt;
+    padding: 1.5pt 8pt;
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .pd-bar {
+    height: 5pt;
+    overflow: hidden;
+    border-radius: 99pt;
+    background: #e5e7eb;
+  }
+
+  .pd-bar > span {
+    display: block;
+    height: 100%;
+  }
+
+  .pd-text {
+    border-left: 2.5pt solid #d1d5db;
+    padding: 1pt 0 1pt 9pt;
+    font-size: 10pt;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .pd-finding {
+    margin-top: 2pt !important;
+  }
+
+  .pd-chips {
+    margin-top: 8pt !important;
+  }
+
+  .pd-chip {
+    display: inline-block;
+    margin: 0 3pt 3pt 0;
+    border: 0.75pt solid #d1d5db;
+    border-radius: 4pt;
+    padding: 0.5pt 5pt;
+    font-size: 8.5pt;
+  }
+
+  .pd-rules {
+    margin-top: 8pt;
+    border: 0.75pt solid #c7c2f5;
+    border-radius: 6pt;
+    background: #f4f3fe;
+    padding: 6pt 9pt;
+    break-inside: avoid;
+  }
+
+  .pd-statement {
+    margin-top: 6pt;
+    break-inside: avoid;
+  }
+
+  .pd-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  .pd-table th {
+    border-bottom: 0.75pt solid #9ca3af;
+    padding: 3pt 8pt 3pt 0;
+    text-align: left;
+    font-size: 7.5pt;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  .pd-table td {
+    border-bottom: 0.75pt solid #e5e7eb;
+    padding: 4pt 8pt 4pt 0;
+    vertical-align: top;
+  }
+
+  .pd-table tr {
+    break-inside: avoid;
+  }
+
+  .pd-table .pd-label {
+    width: 30%;
+    color: #4b5563;
+  }
+
+  .pd-table .pd-num {
+    padding-right: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .pd-table .pd-total td {
+    border-bottom: 0;
+    border-top: 0.75pt solid #9ca3af;
+    font-weight: 700;
+  }
+
+  .pd-foot {
+    margin-top: 16pt;
+    border-top: 0.75pt solid #d1d5db;
+    padding-top: 6pt;
+    font-size: 7.5pt;
+    color: #6b7280;
+    break-inside: avoid;
+  }
+}

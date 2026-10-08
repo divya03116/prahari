@@ -40,7 +40,7 @@ export function SourceBadge({ source }: { source: ReportSource | undefined }) {
   );
 }
 
-const FIELDS: [keyof StructuredIncident, MessageKey][] = [
+export const FIELDS: [keyof StructuredIncident, MessageKey][] = [
   ['title', 'incident.field.title'],
   ['hazardType', 'incident.field.hazardType'],
   ['location', 'incident.field.location'],

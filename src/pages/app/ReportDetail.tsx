@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Archive, ClipboardCheck, Copy, FileX2, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Archive, ClipboardCheck, Copy, FileDown, FileX2, Loader2, MoreHorizontal, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/auth/AuthProvider';
-import { useReportScope } from '@/auth/scope';
 import { CreateActionDialog, EditActionDialog } from '@/components/ActionDialogs';
 import { AttachmentList } from '@/components/Attachments';
+import { ReportPrint } from '@/components/ReportPrint';
 import {
   Contributions,
   EvidenceLegend,
@@ -26,15 +26,15 @@ import { PageHeader } from '@/components/ui/misc';
 import { DataRow, Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
 import { CameraEvidencePanel, HazardEvidencePanel, PhotoCheckPanel, StatementsPanel, StructuredIncidentPanel } from '@/components/IncidentPanels';
 import { useLive } from '@/hooks/data';
+import { useReportActions } from '@/hooks/reportActions';
 import { useI18n } from '@/i18n';
 import { reportTypeKey, shiftKey, sourceKey, verdictHelpKey, verdictKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { daysUntil, formatDate, formatDateTime, formatRelative } from '@/lib/format';
-import { isOverdue, watchReportActions } from '@/services/actions';
+import { isOverdue } from '@/services/actions';
 import { api } from '@/services/callables';
 import { watchReport } from '@/services/reports';
-import { scopeKey, type ReportScope } from '@/services/scope';
 import { LIMITS, VERDICTS, type Verdict } from '@/shared/constants';
 import type { ActionDoc, ReportDoc, WithId } from '@/shared/types';
 
@@ -140,18 +140,12 @@ function VerdictPanel({ report }: { report: WithId<ReportDoc> }) {
 }
 
 function ActionsPanel({ report }: { report: WithId<ReportDoc> }) {
-  const { user, can, profile } = useAuth();
+  const { can, profile } = useAuth();
   const { t } = useI18n();
-  const scope = useReportScope();
   const officer = can('hse-officer');
   const admin = can('admin');
   const manager = can('installation-manager') && profile?.installationId === report.installationId;
-  // Your own report's actions are always visible to you, whatever your wider scope.
-  const actionScope: ReportScope = scope.kind !== 'all' && user && report.reportedBy === user.uid ? { kind: 'own', uid: user.uid } : scope;
-  const actions = useLive<WithId<ActionDoc>[]>(
-    (next, err) => watchReportActions(report.id, actionScope, next, err),
-    [report.id, scopeKey(actionScope)],
-  );
+  const actions = useReportActions(report);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<WithId<ActionDoc> | null>(null);
   const [deleting, setDeleting] = useState<WithId<ActionDoc> | null>(null);
@@ -307,10 +301,23 @@ export default function ReportDetail() {
     }
   };
 
+  // "Save as PDF" in the print dialog names the file after the page title.
+  const exportPdf = () => {
+    const title = document.title;
+    const restore = () => {
+      document.title = title;
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    document.title = `PRAHARI-report-${r.id.slice(0, 8)}`;
+    window.print();
+  };
+
   const scored = r.status === 'scored' && r.score !== undefined && r.tier;
 
   return (
     <>
+      <div className="print:hidden">
       <PageHeader
         eyebrow={
           <span className="flex items-center gap-1.5">
@@ -333,6 +340,9 @@ export default function ReportDetail() {
           .join(' · ')}
         actions={
           <>
+            <Button size="sm" onClick={exportPdf}>
+              <FileDown aria-hidden /> {t('pdf.export')}
+            </Button>
             {admin && !r.archived && (
               <Button size="sm" onClick={() => void rescore()} loading={rescoring}>
                 {!rescoring && <RefreshCw aria-hidden />} {t('detail.rescore')}
@@ -518,6 +528,7 @@ export default function ReportDetail() {
           </Panel>
         </aside>
       </div>
+      </div>
 
       <ConfirmDialog
         open={archiving}
@@ -534,6 +545,8 @@ export default function ReportDetail() {
           });
         }}
       />
+      {/* Renders only while printing: the paper version of this report. */}
+      <ReportPrint report={r} />
     </>
   );
 }
