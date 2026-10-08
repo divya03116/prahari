@@ -18,12 +18,14 @@ import { PageHeader } from '@/components/ui/misc';
 import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
 import { useDebounced } from '@/hooks/data';
 import { useReference } from '@/hooks/reference';
+import { useI18n } from '@/i18n';
+import { reportTypeKey, shiftKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { firebase } from '@/lib/firebase';
 import { api } from '@/services/callables';
 import { removeUpload } from '@/services/storage';
-import { COLLECTIONS, LIMITS, REPORT_TYPE_LABEL, REPORT_TYPES, SHIFTS } from '@/shared/constants';
+import { COLLECTIONS, LIMITS, REPORT_TYPES, SHIFTS } from '@/shared/constants';
 import { analyse } from '@/shared/engine';
 import { reportFieldsSchema, type ReportFields } from '@/shared/schemas';
 
@@ -68,12 +70,13 @@ function RadioRow<T extends string>({
 }
 
 function LivePreview({ text }: { text: string }) {
+  const { t } = useI18n();
   const deferred = useDebounced(text, 250);
   const result = useMemo(() => (deferred.trim().length >= LIMITS.reportTextMin ? analyse(deferred) : null), [deferred]);
 
   return (
     <Panel className="lg:sticky lg:top-6">
-      <PanelHeader title="Preview" description="Computed in your browser as you type" />
+      <PanelHeader title={t('new.preview')} description={t('new.previewDesc')} />
       <PanelBody className="flex flex-col gap-4">
         {result ? (
           <>
@@ -83,21 +86,18 @@ function LivePreview({ text }: { text: string }) {
                 <TierBadge tier={result.tier} />
               </div>
               <ScoreBar score={result.score} tier={result.tier} />
-              <p className="mt-2 text-xs text-fg-subtle">Response window if confirmed: {result.responseWindow}</p>
+              <p className="mt-2 text-xs text-fg-subtle">{t('new.responseWindow', { window: result.responseWindow })}</p>
             </div>
             <EvidenceText text={deferred} spans={result.evidence} className="max-h-48 overflow-y-auto text-sm leading-6" />
             <FindingsGrid energy={result.energy} barrier={result.barrier} exposure={result.exposure} />
             <RuleNet rules={result.rulesTriggered} escalated={result.escalated} preRuleScore={result.preRuleScore} />
           </>
         ) : (
-          <p className="text-sm text-fg-subtle">
-            Describe what happened and the preview appears here: the hazardous energy, the control that failed, and who was
-            exposed.
-          </p>
+          <p className="text-sm text-fg-subtle">{t('new.previewEmpty')}</p>
         )}
         <p className="flex gap-2 border-t border-border pt-3 text-xs text-fg-subtle">
           <Info className="mt-px size-3.5 shrink-0" aria-hidden />
-          A preview only. The score of record is computed by the server when you file, and cannot be edited.
+          {t('new.previewNote')}
         </p>
       </PanelBody>
     </Panel>
@@ -106,6 +106,7 @@ function LivePreview({ text }: { text: string }) {
 
 export default function NewReport() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const { installations, activities, loading: refLoading } = useReference();
   const reportId = useMemo(() => doc(collection(firebase.db, COLLECTIONS.reports)).id, []);
@@ -148,7 +149,7 @@ export default function NewReport() {
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
     if (uploading) {
-      setError('Wait for the attachments to finish uploading.');
+      setError(t('new.waitUploads'));
       return;
     }
     try {
@@ -157,7 +158,7 @@ export default function NewReport() {
         .map((u) => ({ path: u.path, name: u.name, size: u.size, contentType: u.contentType }));
       await api.submitReport({ ...values, reportId, attachments, source: spoken ? 'voice' : 'text' });
       submitted.current = true;
-      toast.success('Report filed', { description: 'The server is scoring it now.' });
+      toast.success(t('new.filed'), { description: t('new.filedDesc') });
       navigate(`/app/reports/${reportId}`, { replace: true });
     } catch (err) {
       setError(errorMessage(err));
@@ -171,11 +172,11 @@ export default function NewReport() {
       <PageHeader
         eyebrow={
           <Link to="/app/reports" className="hover:text-fg">
-            Reports
+            {t('nav.reports')}
           </Link>
         }
-        title="New report"
-        description="Describe what you saw in your own words — English, Hindi, Assamese, Bengali or a mix. Name the hazard, what failed, and who was near it. Never name the person involved."
+        title={t('nav.newReport')}
+        description={t('new.description')}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -186,12 +187,12 @@ export default function NewReport() {
 
               <VoiceInput
                 value={text}
-                onChange={(t) => setValue('text', t, { shouldValidate: t.trim().length >= LIMITS.reportTextMin })}
+                onChange={(heard) => setValue('text', heard, { shouldValidate: heard.trim().length >= LIMITS.reportTextMin })}
                 onUsed={() => setSpoken(true)}
               />
 
               <Field
-                label="What happened"
+                label={t('quick.whatHappened')}
                 error={errors.text?.message}
                 aside={
                   <span className={cn('text-xs tabular', chars > LIMITS.reportTextMax ? 'text-critical' : 'text-fg-subtle')}>
@@ -202,7 +203,7 @@ export default function NewReport() {
                 <Textarea
                   rows={7}
                   autoFocus
-                  placeholder="e.g. Scaffold at the crude unit had no toe board on the third lift. A fitter was working directly below without a barricade."
+                  placeholder={t('new.placeholder')}
                   className="min-h-40 text-md leading-7"
                   {...register('text')}
                 />
@@ -210,21 +211,21 @@ export default function NewReport() {
 
               <div className="flex flex-col gap-1.5">
                 <Label>
-                  <span id="type-label">Type</span>
+                  <span id="type-label">{t('quick.type')}</span>
                 </Label>
                 <RadioRow
                   name="type"
                   labelledBy="type-label"
                   value={type}
                   onChange={(v) => setValue('type', v, { shouldValidate: true })}
-                  options={REPORT_TYPES.map((t) => ({ value: t, label: REPORT_TYPE_LABEL[t] }))}
+                  options={REPORT_TYPES.map((rt) => ({ value: rt, label: t(reportTypeKey(rt)) }))}
                 />
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Installation" error={errors.installationId ? 'Choose an installation' : undefined}>
+                <Field label={t('reports.installation')} error={errors.installationId ? t('new.chooseInstallation') : undefined}>
                   <Select {...register('installationId')} disabled={refLoading}>
-                    <option value="">{refLoading ? 'Loading…' : 'Select installation'}</option>
+                    <option value="">{refLoading ? t('common.loadingEllipsis') : t('new.selectInstallation')}</option>
                     {activeInstallations.map((i) => (
                       <option key={i.id} value={i.id}>
                         {i.name}
@@ -232,9 +233,9 @@ export default function NewReport() {
                     ))}
                   </Select>
                 </Field>
-                <Field label="Activity" error={errors.activityId ? 'Choose an activity' : undefined}>
+                <Field label={t('detail.activity')} error={errors.activityId ? t('new.chooseActivity') : undefined}>
                   <Select {...register('activityId')} disabled={refLoading}>
-                    <option value="">{refLoading ? 'Loading…' : 'Select activity'}</option>
+                    <option value="">{refLoading ? t('common.loadingEllipsis') : t('new.selectActivity')}</option>
                     {activeActivities.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name}
@@ -244,34 +245,34 @@ export default function NewReport() {
                 </Field>
               </div>
               {!refLoading && (activeInstallations.length === 0 || activeActivities.length === 0) && (
-                <Alert tone="warning" title="Reference data is missing">
-                  An administrator needs to add at least one installation and one activity before reports can be filed.
+                <Alert tone="warning" title={t('new.refMissing.title')}>
+                  {t('new.refMissing.body')}
                 </Alert>
               )}
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <Label>
-                    <span id="shift-label">Shift</span>
+                    <span id="shift-label">{t('detail.shift')}</span>
                   </Label>
                   <RadioRow
                     name="shift"
                     labelledBy="shift-label"
                     value={shift}
                     onChange={(v) => setValue('shift', v, { shouldValidate: true })}
-                    options={SHIFTS.map((s) => ({ value: s, label: s }))}
+                    options={SHIFTS.map((s) => ({ value: s, label: t(shiftKey(s)) }))}
                   />
                 </div>
                 <label className="flex cursor-pointer items-center gap-2.5 self-end rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-fg-muted">
                   <Checkbox {...register('contractor')} />
-                  A contractor was involved
+                  {t('new.contractor')}
                 </label>
               </div>
             </PanelBody>
           </Panel>
 
           <Panel>
-            <PanelHeader title="Attachments" description="Optional photos or documents" />
+            <PanelHeader title={t('detail.attachments')} description={t('new.attachmentsDesc')} />
             <PanelBody>
               {user && <AttachmentPicker uid={user.uid} reportId={reportId} onChange={onUploads} disabled={isSubmitting} />}
             </PanelBody>
@@ -279,10 +280,10 @@ export default function NewReport() {
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Link to="/app/reports" className={buttonClass({ variant: 'ghost' })}>
-              Cancel
+              {t('common.cancel')}
             </Link>
             <Button type="submit" variant="primary" loading={isSubmitting} disabled={uploading}>
-              {uploading ? 'Uploading…' : 'File report'}
+              {uploading ? t('new.uploading') : t('new.file')}
             </Button>
           </div>
         </form>

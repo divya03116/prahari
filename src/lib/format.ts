@@ -1,3 +1,4 @@
+import { currentLang, translate, type Lang } from '@/i18n';
 import type { TimestampLike } from '@/shared/types';
 
 type DateInput = TimestampLike | Date | number | null | undefined;
@@ -10,32 +11,54 @@ function toDate(value: DateInput): Date | null {
   return null;
 }
 
-const dateFmt = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-const dateTimeFmt = new Intl.DateTimeFormat('en-IN', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-});
-const shortFmt = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' });
-const rel = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+// Month and weekday names follow the interface language; digits stay 0-9 in
+// every language so scores, dates and counts read the same everywhere.
+const LOCALE: Record<Lang, string> = { en: 'en-IN', hi: 'hi-IN-u-nu-latn', as: 'as-IN-u-nu-latn', bn: 'bn-IN-u-nu-latn' };
+
+interface Formats {
+  date: Intl.DateTimeFormat;
+  dateTime: Intl.DateTimeFormat;
+  short: Intl.DateTimeFormat;
+  month: Intl.DateTimeFormat;
+  rel: Intl.RelativeTimeFormat;
+}
+const formats = new Map<Lang, Formats>();
+
+function fmt(): Formats {
+  const lang = currentLang();
+  let f = formats.get(lang);
+  if (!f) {
+    // Where the browser has no data for a language, fall back to Indian English rather than its own default.
+    const locale = [LOCALE[lang], 'en-IN'];
+    f = {
+      date: new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }),
+      dateTime: new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }),
+      short: new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }),
+      month: new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }),
+      rel: new Intl.RelativeTimeFormat(lang === 'en' ? 'en' : [...locale, 'en'], { numeric: 'auto' }),
+    };
+    formats.set(lang, f);
+  }
+  return f;
+}
 
 export function formatDate(value: DateInput): string {
   const d = toDate(value);
-  return d ? dateFmt.format(d) : '—';
+  return d ? fmt().date.format(d) : '—';
 }
 
 export function formatDateTime(value: DateInput): string {
   const d = toDate(value);
-  return d ? dateTimeFmt.format(d) : '—';
+  return d ? fmt().dateTime.format(d) : '—';
 }
 
 export function formatShortDate(value: DateInput): string {
   const d = toDate(value);
-  return d ? shortFmt.format(d) : '—';
+  return d ? fmt().short.format(d) : '—';
 }
+
+/** Short month name of a UTC date, e.g. for chart axes. */
+export const formatMonth = (d: Date): string => fmt().month.format(d);
 
 const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['year', 365 * 24 * 3600],
@@ -51,9 +74,9 @@ export function formatRelative(value: DateInput, now = Date.now()): string {
   if (!d) return '—';
   const seconds = Math.round((d.getTime() - now) / 1000);
   for (const [unit, size] of STEPS) {
-    if (Math.abs(seconds) >= size) return rel.format(Math.round(seconds / size), unit);
+    if (Math.abs(seconds) >= size) return fmt().rel.format(Math.round(seconds / size), unit);
   }
-  return 'just now';
+  return translate('time.justNow');
 }
 
 /** Whole days from now until `value`; negative when in the past. */

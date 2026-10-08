@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Mic, Square } from 'lucide-react';
 
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { SPEECH_LANGUAGES, speechSupported, startDictation, type Dictation } from '@/ai/speech';
 
@@ -23,6 +24,7 @@ export function VoiceInput({
   size?: 'md' | 'lg';
   className?: string;
 }) {
+  const { t } = useI18n();
   const [supported] = useState(speechSupported);
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function VoiceInput({
   if (!supported) {
     return (
       <p className={cn('rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-fg-muted', className)}>
-        Voice input isn’t available in this browser. Type the report instead — it goes through exactly the same checks.
+        {t('voice.unsupported')}
       </p>
     );
   }
@@ -84,10 +86,10 @@ export function VoiceInput({
           )}
         >
           {listening ? <Square className="size-4" aria-hidden /> : <Mic className="size-4" aria-hidden />}
-          {listening ? 'Stop recording' : 'Report by voice'}
+          {listening ? t('voice.stop') : t('voice.start')}
         </button>
         <select
-          aria-label="Speech language"
+          aria-label={t('voice.language')}
           value={lang}
           disabled={listening}
           onChange={(e) => {
@@ -108,7 +110,7 @@ export function VoiceInput({
         </select>
         {listening && (
           <span role="status" className="inline-flex items-center gap-1.5 text-xs text-critical">
-            <span className="size-2 animate-pulse rounded-full bg-critical" aria-hidden /> Listening — speak now
+            <span className="size-2 animate-pulse rounded-full bg-critical" aria-hidden /> {t('voice.listening')}
           </span>
         )}
       </div>

@@ -14,13 +14,15 @@ import { Alert } from '@/components/ui/feedback';
 import { Field, Select, Textarea } from '@/components/ui/field';
 import { useDebounced } from '@/hooks/data';
 import { useReference } from '@/hooks/reference';
+import { rich, translate, useI18n } from '@/i18n';
+import { reportTypeKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { firebase } from '@/lib/firebase';
 import { detectImage, getModelStatus, modelFor } from '@/ai/inference';
 import { speechSupported } from '@/ai/speech';
 import { api } from '@/services/callables';
-import { COLLECTIONS, LIMITS, REPORT_TYPE_LABEL, REPORT_TYPES, type ReportType } from '@/shared/constants';
+import { COLLECTIONS, LIMITS, REPORT_TYPES, type ReportType } from '@/shared/constants';
 import { analyse, draftCapa } from '@/shared/engine';
 import { analysePhoto, type PhotoFinding } from '@/shared/hazards';
 import { supportedPpe } from '@/shared/ppe';
@@ -51,7 +53,7 @@ async function downscale(file: File, max = 1280): Promise<Blob> {
   c.height = Math.round(bmp.height * s);
   c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
   bmp.close();
-  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not read the photo.'))), 'image/jpeg', 0.9));
+  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error(translate('quick.photoUnreadable')))), 'image/jpeg', 0.9));
 }
 
 /** Seconds a worker has to cancel or edit an AI-drafted report before it is sent. */
@@ -65,9 +67,9 @@ type PhotoCheckState =
   | { state: 'unavailable'; message: string };
 
 function geoError(err: GeolocationPositionError): string {
-  if (err.code === err.PERMISSION_DENIED) return 'Location permission was blocked. You can still submit without it.';
-  if (err.code === err.POSITION_UNAVAILABLE) return 'Your location could not be determined here.';
-  return 'Finding your location took too long. Try again or submit without it.';
+  if (err.code === err.PERMISSION_DENIED) return translate('quick.geo.blocked');
+  if (err.code === err.POSITION_UNAVAILABLE) return translate('quick.geo.unavailable');
+  return translate('quick.geo.timeout');
 }
 
 /**
@@ -77,6 +79,7 @@ function geoError(err: GeolocationPositionError): string {
  */
 export default function QuickReport() {
   const { user, profile } = useAuth();
+  const { t } = useI18n();
   const seesAll = useReportScope().kind === 'all';
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -127,7 +130,7 @@ export default function QuickReport() {
 
   const locate = () => {
     if (!navigator.geolocation) {
-      setGeoMsg('This browser cannot share a location.');
+      setGeoMsg(t('quick.geo.unsupported'));
       return;
     }
     setLocating(true);
@@ -165,7 +168,7 @@ export default function QuickReport() {
       const ppe = modelFor(status.info, 'ppe');
       const result = analysePhoto(r.detections, {
         minConfidence: 0.5,
-        requiredPpe: ppe ? supportedPpe(ppe.classes).filter((t) => t === 'helmet' || t === 'vest') : [],
+        requiredPpe: ppe ? supportedPpe(ppe.classes).filter((p) => p === 'helmet' || p === 'vest') : [],
         ppeMinConfidence: 0.6,
       });
       const models = status.info.models.map((m) => m.name);
@@ -189,18 +192,18 @@ export default function QuickReport() {
   const submit = async () => {
     setError(null);
     if (!attachTo && !installationId) {
-      setError('Choose where this is happening.');
+      setError(t('quick.error.chooseSite'));
       return;
     }
     if (text.trim().length < LIMITS.reportTextMin && !attachTo) {
-      setError(`Describe what you saw in at least ${LIMITS.reportTextMin} characters.`);
+      setError(t('quick.error.tooShort', { min: LIMITS.reportTextMin }));
       return;
     }
     setBusy(true);
     try {
       if (attachTo) {
         await api.addStatement({ reportId: attachTo, text: text.trim(), source: spoken ? 'voice' : 'text' });
-        toast.success('Your account was added to the incident');
+        toast.success(t('quick.toast.accountAdded'));
         // Only people who can see every report can open someone else's incident.
         navigate(seesAll ? `/app/reports/${attachTo}` : '/app', { replace: true });
         return;
@@ -228,7 +231,7 @@ export default function QuickReport() {
       } catch {
         /* optional */
       }
-      toast.success('Report submitted', { description: 'It is being scored now.' });
+      toast.success(t('quick.toast.submitted'), { description: t('quick.toast.scoring') });
       navigate(`/app/reports/${reportId}`, { replace: true });
     } catch (err) {
       setError(errorMessage(err));
@@ -248,41 +251,37 @@ export default function QuickReport() {
       return;
     }
     if (uploading || !installationId || busy) return;
-    const t = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
+    return () => window.clearTimeout(timer);
   }, [countdown, uploading, installationId, busy]);
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4 pb-24">
       <div>
         <h1 className="text-[1.625rem] leading-9 font-bold tracking-[-0.02em] text-fg">
-          {attachTo ? 'Add your account' : 'Report a hazard'}
+          {attachTo ? t('quick.addAccount') : t('nav.report')}
         </h1>
         <p className="mt-1 text-sm text-fg-muted">
-          {attachTo ? (
-            <>
-              Adding to incident{' '}
-              {seesAll ? (
-                <Link to={`/app/reports/${attachTo}`} className="font-mono text-fg hover:underline">{attachTo.slice(0, 8)}</Link>
-              ) : (
-                <span className="font-mono text-fg">{attachTo.slice(0, 8)}</span>
-              )}
-              .
-            </>
-          ) : (
-            'Say, type or photograph what you saw. Never name the person involved.'
-          )}
+          {attachTo
+            ? rich(t('quick.addingTo'), {
+                id: seesAll ? (
+                  <Link to={`/app/reports/${attachTo}`} className="font-mono text-fg hover:underline">{attachTo.slice(0, 8)}</Link>
+                ) : (
+                  <span className="font-mono text-fg">{attachTo.slice(0, 8)}</span>
+                ),
+              })
+            : t('quick.intro')}
         </p>
       </div>
 
       {error && <Alert tone="critical">{error}</Alert>}
 
-      <div role="radiogroup" aria-label="How to report" className={cn('grid gap-2', attachTo ? 'grid-cols-2' : 'grid-cols-3')}>
+      <div role="radiogroup" aria-label={t('quick.howToReport')} className={cn('grid gap-2', attachTo ? 'grid-cols-2' : 'grid-cols-3')}>
         {(
           [
-            ['voice', <Mic key="m" className="size-5" />, 'Voice report'],
-            ['text', <Keyboard key="k" className="size-5" />, 'Text report'],
-            ['photo', <Camera key="c" className="size-5" />, 'Photo report'],
+            ['voice', <Mic key="m" className="size-5" />, t('quick.mode.voice')],
+            ['text', <Keyboard key="k" className="size-5" />, t('quick.mode.text')],
+            ['photo', <Camera key="c" className="size-5" />, t('quick.mode.photo')],
           ] as const
         )
           .filter(([value]) => !(attachTo && value === 'photo'))
@@ -308,10 +307,7 @@ export default function QuickReport() {
 
       {mode === 'photo' && !attachTo && user && (
         <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
-          <p className="text-sm text-fg-muted">
-            Take a photo of the hazard. The AI checks it for unsafe acts, unsafe conditions and near misses, fills in the report and sends it
-            after {AUTO_SUBMIT_SECONDS} seconds — you can cancel or edit first.
-          </p>
+          <p className="text-sm text-fg-muted">{t('quick.photo.intro', { seconds: AUTO_SUBMIT_SECONDS })}</p>
           <AttachmentPicker
             uid={user.uid}
             reportId={reportId}
@@ -321,44 +317,44 @@ export default function QuickReport() {
             variant="button"
             accept="image/jpeg,image/png,image/webp"
             capture="environment"
-            buttonLabel="Take a photo of the hazard"
+            buttonLabel={t('quick.photo.take')}
           />
           {check.state === 'checking' && (
             <p className="flex items-center gap-2 text-sm text-fg-muted" role="status">
-              <Loader2 className="size-4 animate-spin" aria-hidden /> Checking the photo…
+              <Loader2 className="size-4 animate-spin" aria-hidden /> {t('quick.photo.checking')}
             </p>
           )}
           {check.state === 'found' && (
             <div className="flex flex-col gap-2" role="status">
-              <p className="text-sm font-semibold text-fg">AI photo check found</p>
+              <p className="text-sm font-semibold text-fg">{t('quick.photo.found')}</p>
               <ul className="flex flex-col gap-1 text-sm text-fg-muted">
                 {check.findings.map((f) => (
                   <li key={f.type}>
-                    <span className="text-fg">{REPORT_TYPE_LABEL[f.kind]}</span> · {f.text}
+                    <span className="text-fg">{t(reportTypeKey(f.kind))}</span> · {f.text}
                   </li>
                 ))}
               </ul>
-              <p className="text-2xs text-fg-subtle">Models: {check.models.join(', ')}</p>
+              <p className="text-2xs text-fg-subtle">{t('quick.photo.models', { models: check.models.join(', ') })}</p>
             </div>
           )}
           {check.state === 'none' && (
-            <Alert tone="info">The AI found no hazard it recognises in this photo. Describe what you saw below and submit it yourself.</Alert>
+            <Alert tone="info">{t('quick.photo.none')}</Alert>
           )}
           {check.state === 'unavailable' && (
-            <Alert tone="warning">AI photo check unavailable: {check.message} Describe what you saw below; your photo is still attached.</Alert>
+            <Alert tone="warning">{t('quick.photo.unavailable', { reason: check.message })}</Alert>
           )}
           {countdown !== null && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-signal bg-signal-soft px-3 py-2 text-sm" role="alert">
               <span className="text-fg">
                 {uploading
-                  ? 'Uploading the photo…'
+                  ? t('quick.photo.uploading')
                   : !installationId
-                    ? 'Choose where this is happening to send it.'
-                    : `Sending as “${REPORT_TYPE_LABEL[type]}” in ${countdown} s`}
+                    ? t('quick.photo.chooseSite')
+                    : t('quick.photo.sendingIn', { type: t(reportTypeKey(type)), seconds: countdown })}
               </span>
               <span className="flex gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setCountdown(null)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   size="sm"
@@ -367,7 +363,7 @@ export default function QuickReport() {
                     textRef.current?.focus();
                   }}
                 >
-                  Edit
+                  {t('common.edit')}
                 </Button>
               </span>
             </div>
@@ -376,7 +372,7 @@ export default function QuickReport() {
       )}
 
       <Field
-        label={mode === 'voice' ? 'What you said — review and edit before submitting' : 'What happened'}
+        label={mode === 'voice' ? t('quick.whatYouSaid') : t('quick.whatHappened')}
         aside={<span className="text-xs text-fg-subtle tabular">{text.length} / {LIMITS.reportTextMax}</span>}
       >
         <Textarea
@@ -389,16 +385,16 @@ export default function QuickReport() {
             setText(e.target.value);
             setCountdown(null); // the worker is changing it: they will send it themselves
           }}
-          placeholder="e.g. There is an oil spill near the compressor and people are walking through it."
+          placeholder={t('quick.placeholder')}
           className="min-h-32 rounded-2xl text-md leading-7"
         />
       </Field>
 
       {!attachTo && (
         <>
-          <Field label="Where">
+          <Field label={t('quick.where')}>
             <Select value={installationId} onChange={(e) => setInstallationId(e.target.value)} disabled={refLoading} className="h-11 rounded-2xl">
-              <option value="">{refLoading ? 'Loading…' : 'Choose installation'}</option>
+              <option value="">{refLoading ? t('common.loadingEllipsis') : t('quick.chooseInstallation')}</option>
               {active.map((i) => (
                 <option key={i.id} value={i.id}>
                   {i.name}
@@ -407,20 +403,20 @@ export default function QuickReport() {
             </Select>
           </Field>
 
-          <div role="radiogroup" aria-label="Type" className="grid grid-cols-3 gap-2">
-            {REPORT_TYPES.map((t) => (
+          <div role="radiogroup" aria-label={t('quick.type')} className="grid grid-cols-3 gap-2">
+            {REPORT_TYPES.map((rt) => (
               <button
-                key={t}
+                key={rt}
                 type="button"
                 role="radio"
-                aria-checked={type === t}
-                onClick={() => setType(t)}
+                aria-checked={type === rt}
+                onClick={() => setType(rt)}
                 className={cn(
-                  'h-10 cursor-pointer rounded-full border px-2 text-xs font-semibold transition-colors',
-                  type === t ? 'border-fg/40 bg-surface-3 text-fg' : 'border-border-strong text-fg-muted hover:text-fg',
+                  'min-h-10 cursor-pointer rounded-full border px-2 py-1 text-xs leading-4 font-semibold transition-colors',
+                  type === rt ? 'border-fg/40 bg-surface-3 text-fg' : 'border-border-strong text-fg-muted hover:text-fg',
                 )}
               >
-                {REPORT_TYPE_LABEL[t]}
+                {t(reportTypeKey(rt))}
               </button>
             ))}
           </div>
@@ -435,7 +431,7 @@ export default function QuickReport() {
                 variant="button"
                 accept="image/jpeg,image/png,image/webp"
                 capture="environment"
-                buttonLabel="Add photo"
+                buttonLabel={t('quick.addPhoto')}
               />
             )}
             {geo ? (
@@ -447,7 +443,7 @@ export default function QuickReport() {
                     {geo.accuracy ? ` ±${Math.round(geo.accuracy)} m` : ''}
                   </span>
                 </span>
-                <button type="button" aria-label="Remove location" onClick={() => setGeo(null)} className="cursor-pointer text-fg-muted hover:text-fg">
+                <button type="button" aria-label={t('quick.removeLocation')} onClick={() => setGeo(null)} className="cursor-pointer text-fg-muted hover:text-fg">
                   <X className="size-4" />
                 </button>
               </div>
@@ -459,7 +455,7 @@ export default function QuickReport() {
                 className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border-strong bg-surface-2 text-sm font-semibold text-fg transition-colors hover:bg-surface-3 disabled:opacity-60"
               >
                 {locating ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <MapPin className="size-4" aria-hidden />}
-                {locating ? 'Finding location…' : 'Add location'}
+                {locating ? t('quick.findingLocation') : t('quick.addLocation')}
               </button>
             )}
           </div>
@@ -472,7 +468,7 @@ export default function QuickReport() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-canvas/95 p-3 backdrop-blur-sm lg:static lg:border-0 lg:bg-transparent lg:p-0">
         <div className="mx-auto max-w-xl">
           <Button variant="primary" size="lg" className="h-12 w-full" loading={busy} disabled={!canSubmit} onClick={() => void submit()}>
-            {!busy && <Send aria-hidden />} {attachTo ? 'Add to incident' : 'Submit report'}
+            {!busy && <Send aria-hidden />} {attachTo ? t('quick.addToIncident') : t('quick.submit')}
           </Button>
         </div>
       </div>

@@ -5,6 +5,8 @@
  * service to transcribe it; the transcript comes back to the page only.
  */
 
+import { translate } from '@/i18n';
+
 interface RecognitionResult {
   readonly isFinal: boolean;
   readonly 0: { transcript: string };
@@ -44,17 +46,17 @@ export function describeSpeechError(code: string): string {
   switch (code) {
     case 'not-allowed':
     case 'service-not-allowed':
-      return 'Microphone permission was blocked. Allow the microphone for this site, or type the report instead.';
+      return translate('voice.error.blocked');
     case 'no-speech':
-      return 'No speech was heard. Tap the microphone and speak again.';
+      return translate('voice.error.noSpeech');
     case 'audio-capture':
-      return 'No microphone was found. Connect one, or type the report instead.';
+      return translate('voice.error.noMic');
     case 'network':
-      return 'Speech recognition needs an internet connection. Type the report instead.';
+      return translate('voice.error.network');
     case 'language-not-supported':
-      return 'This language is not supported for speech here. Choose another, or type.';
+      return translate('voice.error.language');
     default:
-      return 'Voice input stopped. You can type the report instead.';
+      return translate('voice.error.stopped');
   }
 }
 
@@ -73,7 +75,7 @@ export function startDictation(
   onEnd: () => void,
 ): Dictation {
   const Ctor = ctor();
-  if (!Ctor) throw new Error('Speech recognition is not available in this browser.');
+  if (!Ctor) throw new Error(translate('voice.error.unavailable'));
   const rec = new Ctor();
   rec.lang = lang;
   rec.continuous = true;

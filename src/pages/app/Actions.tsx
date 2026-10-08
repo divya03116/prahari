@@ -14,6 +14,7 @@ import { Panel } from '@/components/ui/panel';
 import { Pagination, Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { usePager } from '@/hooks/data';
 import { useReference } from '@/hooks/reference';
+import { useI18n, type MessageKey } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { daysUntil, formatDate } from '@/lib/format';
 import { isOverdue, listActions, type ActionView } from '@/services/actions';
@@ -21,15 +22,16 @@ import { scopeKey } from '@/services/scope';
 import { LIMITS } from '@/shared/constants';
 import type { ActionDoc, WithId } from '@/shared/types';
 
-const VIEWS: { value: ActionView; label: string }[] = [
-  { value: 'active', label: 'Open' },
-  { value: 'overdue', label: 'Overdue' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'all', label: 'All' },
+const VIEWS: { value: ActionView; label: MessageKey }[] = [
+  { value: 'active', label: 'actions.view.active' },
+  { value: 'overdue', label: 'actions.view.overdue' },
+  { value: 'closed', label: 'actions.view.closed' },
+  { value: 'cancelled', label: 'actions.view.cancelled' },
+  { value: 'all', label: 'actions.view.all' },
 ];
 
 function DueCell({ a }: { a: WithId<ActionDoc> }) {
+  const { t } = useI18n();
   const late = isOverdue(a);
   const d = daysUntil(a.dueAt);
   return (
@@ -37,7 +39,7 @@ function DueCell({ a }: { a: WithId<ActionDoc> }) {
       <span className={cn('text-sm', late ? 'text-critical' : 'text-fg-muted')}>{formatDate(a.dueAt)}</span>
       {(a.status === 'open' || a.status === 'in_progress') && d !== null && (
         <span className={cn('block text-xs', late ? 'text-critical' : 'text-fg-subtle')}>
-          {late ? `${-d}d overdue` : d === 0 ? 'Due today' : `in ${d}d`}
+          {late ? t('detail.overdue', { days: -d }) : d === 0 ? t('actions.dueToday') : t('actions.inDays', { days: d })}
         </span>
       )}
     </div>
@@ -47,6 +49,7 @@ function DueCell({ a }: { a: WithId<ActionDoc> }) {
 export default function Actions() {
   const [params, setParams] = useSearchParams();
   const { can, profile } = useAuth();
+  const { t } = useI18n();
   const scope = useReportScope();
   const { installations } = useReference();
   const [editing, setEditing] = useState<WithId<ActionDoc> | null>(null);
@@ -73,27 +76,26 @@ export default function Actions() {
   return (
     <>
       <PageHeader
-        title="Corrective actions"
-        description={
-          officer
-            ? 'Every control opened against a report. Update status, reassign or reschedule.'
-            : scope.kind === 'installation'
-              ? 'Every control opened against a report at your installation. You can update them here.'
-              : 'The controls opened against your reports, and where each one stands.'
-        }
+        title={t('nav.actions')}
+        description={officer ? t('actions.desc.officer') : scope.kind === 'installation' ? t('actions.desc.installation') : t('actions.desc.own')}
       />
 
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <Segmented label="Action status" value={view} onChange={(v) => set('view', v === 'active' ? null : v)} options={VIEWS} />
+        <Segmented
+          label={t('actions.statusLabel')}
+          value={view}
+          onChange={(v) => set('view', v === 'active' ? null : v)}
+          options={VIEWS.map((v) => ({ value: v.value, label: t(v.label) }))}
+        />
         <div className="flex items-center gap-2">
           {scope.kind !== 'installation' && (
             <Select
-              aria-label="Installation"
+              aria-label={t('reports.installation')}
               value={installationId ?? ''}
               onChange={(e) => set('installation', e.target.value || null)}
               className="sm:w-56"
             >
-              <option value="">All installations</option>
+              <option value="">{t('reports.allInstallations')}</option>
               {installations.map((i) => (
                 <option key={i.id} value={i.id}>
                   {i.name}
@@ -112,11 +114,9 @@ export default function Actions() {
         ) : !pager.items.length ? (
           <EmptyState
             icon={<ClipboardCheck />}
-            title={view === 'overdue' ? 'Nothing is overdue' : view === 'active' ? 'No open actions' : 'No actions here'}
+            title={view === 'overdue' ? t('actions.empty.overdue') : view === 'active' ? t('actions.empty.active') : t('actions.empty.none')}
             description={
-              view === 'active' || view === 'all'
-                ? 'Tier 1 and Tier 2 reports open corrective actions automatically when they are scored.'
-                : undefined
+              view === 'active' || view === 'all' ? t('actions.empty.desc') : undefined
             }
           />
         ) : (
@@ -124,13 +124,13 @@ export default function Actions() {
             <Table>
               <THead>
                 <tr>
-                  <TH>Control</TH>
-                  <TH className="hidden md:table-cell">Installation</TH>
-                  <TH className="hidden lg:table-cell">Owner</TH>
-                  <TH>Status</TH>
-                  <TH className="hidden sm:table-cell">Due</TH>
+                  <TH>{t('action.control')}</TH>
+                  <TH className="hidden md:table-cell">{t('reports.installation')}</TH>
+                  <TH className="hidden lg:table-cell">{t('action.owner')}</TH>
+                  <TH>{t('action.status')}</TH>
+                  <TH className="hidden sm:table-cell">{t('actions.col.due')}</TH>
                   <TH className="w-16 px-2 text-right">
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">{t('actions.col.actions')}</span>
                   </TH>
                 </tr>
               </THead>
@@ -144,7 +144,7 @@ export default function Actions() {
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-fg-subtle">
                         <TierBadge tier={a.tier} compact />
                         <Link to={`/app/reports/${a.reportId}`} className="whitespace-nowrap hover:text-fg hover:underline">
-                          View report
+                          {t('actions.viewReport')}
                         </Link>
                         <span className="min-w-0 truncate md:hidden">· {a.installationName}</span>
                       </div>
@@ -162,7 +162,7 @@ export default function Actions() {
                     <TD className="px-2 text-right">
                       {editable(a) ? (
                         <Button size="xs" onClick={() => setEditing(a)}>
-                          Update
+                          {t('common.update')}
                         </Button>
                       ) : null}
                     </TD>

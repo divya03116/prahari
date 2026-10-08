@@ -4,50 +4,53 @@
  * Callables already throw readable messages (see functions/src/lib/core.ts),
  * so for `functions/*` codes the server's message is used as-is. Auth and
  * Firestore codes are translated here. Anything unrecognised falls back to a
- * generic line — raw stack traces and internal codes are never shown.
+ * generic line — raw stack traces and internal codes are never shown. The
+ * sentences are in the interface language; the server's own are in English.
  */
 
-const AUTH: Record<string, string> = {
-  'auth/invalid-credential': 'Email or password is incorrect.',
-  'auth/invalid-login-credentials': 'Email or password is incorrect.',
-  'auth/wrong-password': 'Email or password is incorrect.',
-  'auth/user-not-found': 'Email or password is incorrect.',
-  'auth/invalid-email': 'Enter a valid email address.',
-  'auth/email-already-in-use': 'An account with this email already exists. Sign in instead.',
-  'auth/weak-password': 'Choose a stronger password — at least 8 characters.',
-  'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
-  'auth/user-disabled': 'This account has been disabled. Contact your administrator.',
-  'auth/network-request-failed': 'Network error. Check your connection and try again.',
-  'auth/popup-closed-by-user': 'The sign-in window was closed before finishing.',
-  'auth/cancelled-popup-request': 'The sign-in window was closed before finishing.',
-  'auth/popup-blocked': 'Your browser blocked the sign-in window. Allow pop-ups for this site.',
-  'auth/expired-action-code': 'This link has expired. Request a new one.',
-  'auth/invalid-action-code': 'This link is invalid or has already been used.',
-  'auth/requires-recent-login': 'For security, sign in again before doing that.',
+import { translate, type MessageKey } from '@/i18n';
+
+const AUTH: Record<string, MessageKey> = {
+  'auth/invalid-credential': 'err.credentials',
+  'auth/invalid-login-credentials': 'err.credentials',
+  'auth/wrong-password': 'err.credentials',
+  'auth/user-not-found': 'err.credentials',
+  'auth/invalid-email': 'err.invalidEmail',
+  'auth/email-already-in-use': 'err.emailInUse',
+  'auth/weak-password': 'err.weakPassword',
+  'auth/too-many-requests': 'err.tooManyAttempts',
+  'auth/user-disabled': 'err.userDisabled',
+  'auth/network-request-failed': 'err.network',
+  'auth/popup-closed-by-user': 'err.popupClosed',
+  'auth/cancelled-popup-request': 'err.popupClosed',
+  'auth/popup-blocked': 'err.popupBlocked',
+  'auth/expired-action-code': 'err.linkExpired',
+  'auth/invalid-action-code': 'err.linkInvalid',
+  'auth/requires-recent-login': 'err.recentLogin',
   'auth/account-exists-with-different-credential':
-    'An account already exists with this email using a different sign-in method.',
-  'auth/operation-not-allowed': 'This sign-in method is not enabled for this project.',
-  'auth/unauthorized-domain': 'This domain is not authorised for sign-in in the Firebase console.',
-  'auth/user-token-expired': 'Your session has expired. Sign in again.',
-  'auth/invalid-phone-number': 'Enter the phone number with its country code, e.g. +91 98765 43210.',
-  'auth/missing-phone-number': 'Enter your phone number.',
-  'auth/invalid-verification-code': 'That code is not right. Check the SMS and try again.',
-  'auth/missing-verification-code': 'Enter the 6-digit code from the SMS.',
-  'auth/code-expired': 'That code has expired. Send a new one.',
-  'auth/quota-exceeded': 'The SMS limit has been reached for now. Try again later or use another sign-in method.',
-  'auth/captcha-check-failed': 'The security check failed. Reload the page and try again.',
-  'auth/invalid-app-credential': 'The security check failed. Reload the page and try again.',
-  'auth/invalid-oauth-client-id': 'Apple sign-in is not fully set up for this project yet.',
+    'err.differentMethod',
+  'auth/operation-not-allowed': 'err.methodNotEnabled',
+  'auth/unauthorized-domain': 'err.domainNotAuthorised',
+  'auth/user-token-expired': 'err.sessionExpired',
+  'auth/invalid-phone-number': 'err.phoneInvalid',
+  'auth/missing-phone-number': 'err.phoneMissing',
+  'auth/invalid-verification-code': 'err.codeWrong',
+  'auth/missing-verification-code': 'err.codeMissing',
+  'auth/code-expired': 'err.codeExpired',
+  'auth/quota-exceeded': 'err.smsQuota',
+  'auth/captcha-check-failed': 'err.securityCheck',
+  'auth/invalid-app-credential': 'err.securityCheck',
+  'auth/invalid-oauth-client-id': 'err.appleNotSetUp',
 };
 
-const FIRESTORE: Record<string, string> = {
-  'permission-denied': 'You do not have access to this.',
-  unavailable: 'The service is temporarily unreachable. Retrying may help.',
-  'failed-precondition': 'This view needs a database index that is still building. Try again shortly.',
-  'resource-exhausted': 'Too many requests. Wait a moment and try again.',
-  'deadline-exceeded': 'The request took too long. Try again.',
-  unauthenticated: 'Your session has expired. Sign in again.',
-  'not-found': 'That record no longer exists.',
+const FIRESTORE: Record<string, MessageKey> = {
+  'permission-denied': 'err.noAccess',
+  unavailable: 'err.unavailable',
+  'failed-precondition': 'err.indexBuilding',
+  'resource-exhausted': 'err.tooManyRequests',
+  'deadline-exceeded': 'err.tookTooLong',
+  unauthenticated: 'err.sessionExpired',
+  'not-found': 'err.notFound',
 };
 
 interface CodedError {
@@ -55,10 +58,7 @@ interface CodedError {
   message?: string;
 }
 
-const UNREACHABLE =
-  'The PRAHARI server could not be reached. Check the internet connection; if it keeps happening, the server functions are not deployed yet.';
-
-export function errorMessage(err: unknown, fallback = 'Something went wrong. Try again.'): string {
+export function errorMessage(err: unknown, fallback = translate('err.fallback')): string {
   if (!err || typeof err !== 'object') return fallback;
   const { code = '', message = '' } = err as CodedError;
 
@@ -66,29 +66,29 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong. Try
   // the console (the user still sees the calm fallback).
   if (!code) console.error('Unexpected error', err);
 
-  if (code.startsWith('auth/')) return AUTH[code] ?? fallback;
+  if (code.startsWith('auth/')) return code in AUTH ? translate(AUTH[code]) : fallback;
 
   if (code.startsWith('functions/')) {
     const short = code.slice('functions/'.length);
     // The server's message is written for people; 'internal' is deliberately generic.
     // A bare "internal [0]" comes from the SDK itself: no usable reply at all
     // (offline, or the server functions are not deployed), so say that instead.
-    if (short === 'internal') return /^internal(?: \[0\])?$/.test(message) ? UNREACHABLE : fallback;
-    if (short === 'unavailable') return FIRESTORE.unavailable;
+    if (short === 'internal') return /^internal(?: \[0\])?$/.test(message) ? translate('err.unreachable') : fallback;
+    if (short === 'unavailable') return translate(FIRESTORE.unavailable);
     return message || fallback;
   }
 
   if (code in FIRESTORE) {
-    if (code === 'failed-precondition' && /index/i.test(message)) return FIRESTORE['failed-precondition'];
+    if (code === 'failed-precondition' && /index/i.test(message)) return translate(FIRESTORE['failed-precondition']);
     if (code === 'failed-precondition') return message || fallback;
-    return FIRESTORE[code];
+    return translate(FIRESTORE[code]);
   }
 
   if (code.startsWith('storage/')) {
-    if (code === 'storage/unauthorized') return 'Upload refused. Only JPEG, PNG, WebP or PDF files up to 10 MB.';
-    if (code === 'storage/canceled') return 'Upload cancelled.';
-    if (code === 'storage/retry-limit-exceeded') return 'Upload timed out. Check your connection.';
-    if (code === 'storage/object-not-found') return 'That file no longer exists.';
+    if (code === 'storage/unauthorized') return translate('err.uploadRefused');
+    if (code === 'storage/canceled') return translate('err.uploadCancelled');
+    if (code === 'storage/retry-limit-exceeded') return translate('err.uploadTimedOut');
+    if (code === 'storage/object-not-found') return translate('err.fileGone');
     return fallback;
   }
 

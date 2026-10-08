@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileImage, FileText, Loader2, Paperclip, Trash2, UploadCloud } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { rich, useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { formatBytes } from '@/lib/format';
@@ -32,7 +33,7 @@ export function AttachmentPicker({
   variant = 'dropzone',
   accept,
   capture,
-  buttonLabel = 'Add photo',
+  buttonLabel,
   onFile,
 }: {
   uid: string;
@@ -48,6 +49,7 @@ export function AttachmentPicker({
   /** Called with each accepted file as its upload starts (e.g. to analyse a photo). */
   onFile?: (file: File) => void;
 }) {
+  const { t } = useI18n();
   const [items, setItems] = useState<UploadItem[]>([]);
   const [rejects, setRejects] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -63,7 +65,7 @@ export function AttachmentPicker({
     const errs: string[] = [];
     const room = LIMITS.attachmentsMax - items.length;
     const chosen = [...files];
-    if (chosen.length > room) errs.push(`At most ${LIMITS.attachmentsMax} files per report.`);
+    if (chosen.length > room) errs.push(t('attach.tooMany', { max: LIMITS.attachmentsMax }));
     for (const file of chosen.slice(0, Math.max(0, room))) {
       const invalid = validateFile(file);
       if (invalid) {
@@ -107,7 +109,7 @@ export function AttachmentPicker({
       capture={capture}
       className="sr-only"
       tabIndex={-1}
-      aria-label="Attach files"
+      aria-label={t('attach.attach')}
       onChange={(e) => {
         if (e.target.files) add(e.target.files);
         e.target.value = '';
@@ -125,7 +127,7 @@ export function AttachmentPicker({
           className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border-strong bg-surface-2 text-sm font-semibold text-fg transition-colors hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <UploadCloud className="size-4" aria-hidden />
-          {full ? `${LIMITS.attachmentsMax} photos added` : buttonLabel}
+          {full ? t('attach.full', { max: LIMITS.attachmentsMax }) : (buttonLabel ?? t('quick.addPhoto'))}
         </button>
       ) : null}
       {variant === 'button' && fileInput}
@@ -149,17 +151,20 @@ export function AttachmentPicker({
       >
         <UploadCloud className="size-5 text-fg-subtle" aria-hidden />
         <p className="text-sm text-fg-muted">
-          Drop photos or PDFs here, or{' '}
-          <button
-            type="button"
-            disabled={disabled || full}
-            onClick={() => inputRef.current?.click()}
-            className="cursor-pointer font-medium text-fg underline-offset-4 hover:underline disabled:cursor-not-allowed"
-          >
-            browse
-          </button>
+          {rich(t('attach.drop'), {
+            browse: (
+              <button
+                type="button"
+                disabled={disabled || full}
+                onClick={() => inputRef.current?.click()}
+                className="cursor-pointer font-medium text-fg underline-offset-4 hover:underline disabled:cursor-not-allowed"
+              >
+                {t('attach.browse')}
+              </button>
+            ),
+          })}
         </p>
-        <p className="text-xs text-fg-subtle">JPEG, PNG, WebP or PDF · up to 10 MB each · {LIMITS.attachmentsMax} files max</p>
+        <p className="text-xs text-fg-subtle">{t('attach.limits', { max: LIMITS.attachmentsMax })}</p>
         {fileInput}
       </div>
       )}
@@ -184,19 +189,19 @@ export function AttachmentPicker({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-fg">{i.name}</p>
                 {i.state === 'uploading' ? (
-                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuenow={Math.round(i.progress * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={`Uploading ${i.name}`}>
+                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuenow={Math.round(i.progress * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={t('attach.uploadingFile', { name: i.name })}>
                     <div className="h-full bg-signal transition-[width]" style={{ width: `${Math.round(i.progress * 100)}%` }} />
                   </div>
                 ) : i.state === 'error' ? (
                   <p className="text-xs text-critical">{i.error}</p>
                 ) : (
-                  <p className="text-xs text-fg-subtle">{formatBytes(i.size)} · uploaded</p>
+                  <p className="text-xs text-fg-subtle">{t('attach.uploaded', { size: formatBytes(i.size) })}</p>
                 )}
               </div>
               {i.state === 'uploading' ? (
-                <Loader2 className="size-4 animate-spin text-fg-subtle" aria-label="Uploading" />
+                <Loader2 className="size-4 animate-spin text-fg-subtle" aria-label={t('attach.uploading')} />
               ) : (
-                <Button variant="ghost" size="icon-sm" aria-label={`Remove ${i.name}`} onClick={() => void remove(i)} disabled={disabled}>
+                <Button variant="ghost" size="icon-sm" aria-label={t('attach.remove', { name: i.name })} onClick={() => void remove(i)} disabled={disabled}>
                   <Trash2 aria-hidden />
                 </Button>
               )}
@@ -210,6 +215,7 @@ export function AttachmentPicker({
 
 /** Read-only list of a filed report's attachments. URLs are fetched on click. */
 export function AttachmentList({ items }: { items: AttachmentMeta[] }) {
+  const { t } = useI18n();
   const [opening, setOpening] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -232,7 +238,7 @@ export function AttachmentList({ items }: { items: AttachmentMeta[] }) {
     }
   };
 
-  if (!items.length) return <p className="text-sm text-fg-subtle">No attachments.</p>;
+  if (!items.length) return <p className="text-sm text-fg-subtle">{t('attach.none')}</p>;
   return (
     <div className="flex flex-col gap-2">
       <ul className="divide-y divide-border rounded-md border border-border">
@@ -245,7 +251,7 @@ export function AttachmentList({ items }: { items: AttachmentMeta[] }) {
             >
               <Paperclip className="size-4 shrink-0 text-fg-subtle" aria-hidden />
               <span className="min-w-0 flex-1 truncate text-sm text-fg">{a.name}</span>
-              <span className="shrink-0 text-xs text-fg-subtle">{opening === a.path ? 'Opening…' : formatBytes(a.size)}</span>
+              <span className="shrink-0 text-xs text-fg-subtle">{opening === a.path ? t('attach.opening') : formatBytes(a.size)}</span>
             </button>
           </li>
         ))}

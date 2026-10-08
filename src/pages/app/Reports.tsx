@@ -14,19 +14,21 @@ import { Panel } from '@/components/ui/panel';
 import { Pagination, Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { useDebounced, usePager } from '@/hooks/data';
 import { useReference } from '@/hooks/reference';
+import { useI18n, type MessageKey } from '@/i18n';
+import { reportTypeKey, shiftKey, tierKey } from '@/i18n/labels';
 import { formatDateTime, formatRelative } from '@/lib/format';
 import { DEFAULT_FILTERS, listReports, type ReportFilters, type ReportSort, type ReportView } from '@/services/reports';
 import { scopeKey } from '@/services/scope';
-import { LIMITS, REPORT_TYPE_LABEL, type Tier } from '@/shared/constants';
+import { LIMITS, type Tier } from '@/shared/constants';
 import { queryToken } from '@/shared/search';
 import type { ReportDoc, WithId } from '@/shared/types';
 
-const VIEWS: { value: ReportView; label: string; min?: 'hse-officer' }[] = [
-  { value: 'active', label: 'Active' },
-  { value: 'review', label: 'Awaiting review' },
-  { value: 'processing', label: 'Processing' },
-  { value: 'mine', label: 'Filed by me' },
-  { value: 'archived', label: 'Archived', min: 'hse-officer' },
+const VIEWS: { value: ReportView; label: MessageKey; min?: 'hse-officer' }[] = [
+  { value: 'active', label: 'reports.view.active' },
+  { value: 'review', label: 'reports.view.review' },
+  { value: 'processing', label: 'reports.view.processing' },
+  { value: 'mine', label: 'reports.view.mine' },
+  { value: 'archived', label: 'reports.view.archived', min: 'hse-officer' },
 ];
 
 function readFilters(p: URLSearchParams): ReportFilters {
@@ -42,17 +44,19 @@ function readFilters(p: URLSearchParams): ReportFilters {
 }
 
 function StatusCell({ r }: { r: WithId<ReportDoc> }) {
-  if (r.archived) return <Badge>Archived</Badge>;
-  if (r.status === 'pending') return <Badge tone="info">Scoring…</Badge>;
-  if (r.status === 'failed') return <Badge tone="critical">Scoring failed</Badge>;
+  const { t } = useI18n();
+  if (r.archived) return <Badge>{t('reports.view.archived')}</Badge>;
+  if (r.status === 'pending') return <Badge tone="info">{t('reports.status.scoring')}</Badge>;
+  if (r.status === 'failed') return <Badge tone="critical">{t('reports.status.failed')}</Badge>;
   if (r.verdict) return <VerdictBadge verdict={r.verdict.decision} />;
-  return <span className="text-xs whitespace-nowrap text-fg-subtle">Awaiting review</span>;
+  return <span className="text-xs whitespace-nowrap text-fg-subtle">{t('reports.view.review')}</span>;
 }
 
 export default function Reports() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, can } = useAuth();
+  const { t } = useI18n();
   const scope = useReportScope();
   const { installations } = useReference();
   const filters = readFilters(params);
@@ -84,27 +88,21 @@ export default function Reports() {
   return (
     <>
       <PageHeader
-        title="Reports"
-        description={
-          scope.kind === 'all'
-            ? 'The register of every unsafe act, unsafe condition and near miss, scored for serious-injury potential.'
-            : scope.kind === 'installation'
-              ? 'Reports at your installation, scored for serious-injury potential. “Filed by me” also lists yours from other sites.'
-              : 'The reports you have filed, scored for serious-injury potential. HSE officers see every report.'
-        }
+        title={t('nav.reports')}
+        description={scope.kind === 'all' ? t('reports.desc.all') : scope.kind === 'installation' ? t('reports.desc.installation') : t('reports.desc.own')}
         actions={
           <Link to="/app/reports/new" className={buttonClass({ variant: 'primary' })}>
-            <Plus aria-hidden /> New report
+            <Plus aria-hidden /> {t('nav.newReport')}
           </Link>
         }
       />
 
       <div className="mb-3">
         <Segmented
-          label="Report view"
+          label={t('reports.viewLabel')}
           value={filters.view}
           onChange={(v) => set({ view: v === 'active' ? null : v })}
-          options={views}
+          options={views.map((v) => ({ value: v.value, label: t(v.label) }))}
         />
       </div>
 
@@ -115,28 +113,30 @@ export default function Reports() {
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />
               <Input
                 type="search"
-                aria-label="Search reports"
-                placeholder="Search by word — e.g. scaffold, H2S, crane"
+                aria-label={t('reports.search')}
+                placeholder={t('reports.searchPlaceholder')}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-8"
               />
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex">
-              <Select aria-label="Tier" value={filters.tier ?? ''} onChange={(e) => set({ tier: e.target.value || null })} className="lg:w-36">
-                <option value="">All tiers</option>
-                <option value="1">Tier 1 · Critical</option>
-                <option value="2">Tier 2 · Elevated</option>
-                <option value="3">Tier 3 · Controlled</option>
+              <Select aria-label={t('reports.tier')} value={filters.tier ?? ''} onChange={(e) => set({ tier: e.target.value || null })} className="lg:w-36">
+                <option value="">{t('reports.allTiers')}</option>
+                {([1, 2, 3] as const).map((tier) => (
+                  <option key={tier} value={tier}>
+                    {t('tier.label', { tier, label: t(tierKey(tier)) })}
+                  </option>
+                ))}
               </Select>
               {scope.kind !== 'installation' && (
                 <Select
-                  aria-label="Installation"
+                  aria-label={t('reports.installation')}
                   value={filters.installationId ?? ''}
                   onChange={(e) => set({ installation: e.target.value || null })}
                   className="lg:w-48"
                 >
-                  <option value="">All installations</option>
+                  <option value="">{t('reports.allInstallations')}</option>
                   {installations.map((i) => (
                     <option key={i.id} value={i.id}>
                       {i.name}
@@ -145,14 +145,14 @@ export default function Reports() {
                 </Select>
               )}
               <Select
-                aria-label="Sort"
+                aria-label={t('reports.sort')}
                 value={searching ? 'newest' : filters.sort}
                 disabled={searching}
                 onChange={(e) => set({ sort: (e.target.value as ReportSort) === 'newest' ? 'newest' : null })}
                 className="col-span-2 sm:col-span-1 lg:w-40"
               >
-                <option value="priority">Highest potential</option>
-                <option value="newest">Newest first</option>
+                <option value="priority">{t('reports.sort.priority')}</option>
+                <option value="newest">{t('reports.sort.newest')}</option>
               </Select>
               {hasFilters && (
                 <Button
@@ -163,7 +163,7 @@ export default function Reports() {
                     set({ tier: null, installation: null, q: null, sort: null });
                   }}
                 >
-                  <X aria-hidden /> Clear
+                  <X aria-hidden /> {t('common.clear')}
                 </Button>
               )}
             </div>
@@ -171,7 +171,7 @@ export default function Reports() {
         )}
         {searching && filters.view === 'review' && (
           <p className="border-b border-border px-4 py-2 text-xs text-fg-subtle">
-            Search covers all active reports, newest first; the review filter does not apply while searching.
+            {t('reports.searchNote')}
           </p>
         )}
 
@@ -184,28 +184,28 @@ export default function Reports() {
             icon={<FileText />}
             title={
               filters.search
-                ? `No reports contain “${filters.search}”`
+                ? t('reports.empty.search', { query: filters.search })
                 : filters.view === 'review'
-                  ? 'Nothing is waiting for review'
+                  ? t('reports.empty.review')
                   : filters.view === 'processing'
-                    ? 'No reports are being processed'
+                    ? t('reports.empty.processing')
                     : filters.view === 'archived'
-                      ? 'No archived reports'
-                      : 'No reports match'
+                      ? t('reports.empty.archived')
+                      : t('reports.empty.none')
             }
             description={
               filters.search
-                ? 'Search matches whole words. Try a different word, or clear the filters.'
+                ? t('reports.empty.searchHint')
                 : hasFilters
-                  ? 'Try removing a filter.'
+                  ? t('reports.empty.filterHint')
                   : filters.view === 'mine'
-                    ? 'Reports you file appear here.'
+                    ? t('reports.empty.mineHint')
                     : undefined
             }
             action={
               filters.view === 'mine' || (!hasFilters && filters.view === 'active') ? (
                 <Link to="/app/reports/new" className={buttonClass({ variant: 'primary', size: 'sm' })}>
-                  File a report
+                  {t('reports.file')}
                 </Link>
               ) : undefined
             }
@@ -215,12 +215,12 @@ export default function Reports() {
             <Table>
               <THead>
                 <tr>
-                  <TH className="w-20 pr-2 sm:w-24 sm:pr-4">Score</TH>
-                  <TH className="pl-2 sm:pl-4">Report</TH>
-                  <TH className="hidden md:table-cell">Installation</TH>
-                  <TH className="hidden xl:table-cell">Type</TH>
-                  <TH className="hidden xl:table-cell">Review</TH>
-                  <TH className="hidden sm:table-cell text-right">Filed</TH>
+                  <TH className="w-20 pr-2 sm:w-24 sm:pr-4">{t('reports.col.score')}</TH>
+                  <TH className="pl-2 sm:pl-4">{t('reports.col.report')}</TH>
+                  <TH className="hidden md:table-cell">{t('reports.installation')}</TH>
+                  <TH className="hidden xl:table-cell">{t('quick.type')}</TH>
+                  <TH className="hidden xl:table-cell">{t('reports.col.review')}</TH>
+                  <TH className="hidden sm:table-cell text-right">{t('reports.col.filed')}</TH>
                 </tr>
               </THead>
               <tbody>
@@ -240,7 +240,10 @@ export default function Reports() {
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-fg-subtle">
                         {r.tier && <TierBadge tier={r.tier} compact />}
                         <span className="truncate md:hidden">{r.installationName}</span>
-                        <span className="hidden truncate md:inline">{r.activityName} · {r.shift} shift{r.contractor ? ' · Contractor' : ''}</span>
+                        <span className="hidden truncate md:inline">
+                          {r.activityName} · {t('reports.shiftLabel', { shift: t(shiftKey(r.shift)) })}
+                          {r.contractor ? ` · ${t('reports.contractor')}` : ''}
+                        </span>
                         {r.verdict && (
                           <span className="xl:hidden">
                             <VerdictBadge verdict={r.verdict.decision} />
@@ -253,7 +256,7 @@ export default function Reports() {
                         {r.installationName}
                       </span>
                     </TD>
-                    <TD className="hidden whitespace-nowrap xl:table-cell">{REPORT_TYPE_LABEL[r.type]}</TD>
+                    <TD className="hidden whitespace-nowrap xl:table-cell">{t(reportTypeKey(r.type))}</TD>
                     <TD className="hidden whitespace-nowrap xl:table-cell">
                       <StatusCell r={r} />
                     </TD>
@@ -273,7 +276,7 @@ export default function Reports() {
             onPrev={pager.prev}
             onNext={pager.next}
             loading={pager.loading}
-            summary={`Page ${pager.page} · ${pager.items.length} shown`}
+            summary={t('reports.pageSummary', { page: pager.page, count: pager.items.length })}
           />
         )}
       </Panel>
