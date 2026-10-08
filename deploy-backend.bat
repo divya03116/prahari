@@ -27,7 +27,7 @@ if errorlevel 1 goto fail
 
 echo.
 echo Backend deployed.
-echo Next: sign in on https://prahari-silk.vercel.app with divy1103@gmail.com, then open
+echo Next: sign in on https://prahari-silk.vercel.app with the administrator address set in functions\.env.prahari-2, then open
 echo https://prahari-silk.vercel.app/app/settings?setup=admin and press "Become the first administrator".
 pause
 exit /b 0
