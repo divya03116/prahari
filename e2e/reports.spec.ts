@@ -166,13 +166,18 @@ test('a reviewer sees only their own reports', async ({ page }) => {
   await expect(page.getByRole('row').first()).toBeVisible();
   // Every row is theirs, so the "Filed by me" view would only repeat the list.
   await expect(page.getByRole('radio', { name: 'Filed by me' })).toHaveCount(0);
-  const mine = await page.getByRole('row').count();
+  const listed = () => page.getByRole('row').getByRole('link').evaluateAll((links) => links.map((a) => a.getAttribute('href')));
+  const mine = new Set(await listed());
+  expect(mine.size).toBeGreaterThan(0);
   await signOut(page);
 
+  // An officer's register (same order: highest potential first) also holds
+  // reports this reviewer did not file. Compared by report, not by row count:
+  // both lists stop at one page.
   await signIn(page, 'officer');
   await page.goto('/app/reports');
-  await expect(page.getByRole('row').first()).toBeVisible();
-  expect(await page.getByRole('row').count()).toBeGreaterThan(mine);
+  await expect(page.getByRole('row').nth(1)).toBeVisible();
+  expect((await listed()).some((href) => !mine.has(href))).toBe(true);
 });
 
 test('a reviewer cannot open the administration screens', async ({ page }) => {
