@@ -974,4 +974,10 @@ export const bn: Record<MessageKey, string> = {
   'account.disabled': 'আপনার অ্যাকাউন্ট প্রশাসক বন্ধ করেছেন।',
   'account.roleNow': 'এখন আপনার ভূমিকা {role}।',
   'account.roleChanged': 'আপনার প্রবেশাধিকারের স্তর বদলেছে। চালিয়ে যেতে আবার সাইন ইন করুন।',
+
+  // phone tab bar
+  'nav.quick': 'দ্রুত মেনু',
+  'nav.tab.home': 'হোম',
+  'nav.tab.report': 'রিপোর্ট করুন',
+  'nav.tab.actions': 'ব্যবস্থা',
 };
