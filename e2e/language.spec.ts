@@ -26,6 +26,16 @@ test.describe('interface language', () => {
     await expect(page.getByRole('button', { name: 'Google से जारी रखें' })).toBeVisible();
   });
 
+  test('the public page can be read in another language; its example reports stay as written', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('could have become');
+
+    await page.getByRole('contentinfo').getByRole('combobox', { name: 'Language' }).selectOption('as');
+    await expect(page.getByRole('heading', { level: 2, name: 'ই কেনেকৈ কাম কৰে' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'ছাইন ইন কৰক' })).toBeVisible();
+    await expect(page.getByText('Scaffold third lift missing toe boards, fitter working directly below', { exact: true })).toBeVisible();
+  });
+
   test('the menu and settings follow the language chosen in the app', async ({ page }) => {
     await signIn(page, 'reviewer');
     await page.goto('/app/settings');

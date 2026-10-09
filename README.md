@@ -170,8 +170,9 @@ digits.
 What a person wrote is **never translated** — narratives, statements and notes are
 shown exactly as written, in whatever language they were written. Still English
 only: text produced by the scoring engine and the server (hazard names, rule
-titles, drafted actions, the server's refusals) and the public landing page. Every
-screen behind sign-in is translated. The Hindi, Assamese and Bengali wording
+titles, drafted actions, the server's refusals). Every screen is translated,
+including the public landing page; its example reports are shown as written,
+because the engine is scoring exactly those words. The Hindi, Assamese and Bengali wording
 was written without a native-speaking safety practitioner and needs that review
 before operational use.
 
@@ -757,6 +758,11 @@ time the app, not that cold start.
   times; the evidence frame lets an officer dismiss a false alarm in seconds.
 - **Licensing:** the PPE dataset and Ultralytics YOLO are AGPL-3.0 (see
   `ai/README.md`).
-- **Dev tooling advisories:** `npm audit` reports moderate advisories inside the
-  `firebase-tools` CLI's dependency tree (no fixed release yet). The shipped web app
-  and Cloud Functions report **0** vulnerabilities.
+- **Dependency advisories.** `npm audit --omit=dev` flags four high-severity
+  advisories in `@grpc/grpc-js`, which the Firebase web SDK installs for its
+  Node-only build and pins to an old release. It is not part of the browser
+  bundle — no file in `dist/` contains it — so the deployed site is not exposed;
+  it can be cleared with an `overrides` entry for `@grpc/grpc-js` in
+  `package.json`. The Cloud Functions report **0** vulnerabilities. `npm audit`
+  also reports moderate advisories inside the `firebase-tools` CLI's dependency
+  tree (development only, no fixed release yet).
