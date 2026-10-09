@@ -988,6 +988,59 @@ export const en = {
   'nav.tab.home': 'Home',
   'nav.tab.report': 'Report',
   'nav.tab.actions': 'Actions',
+
+  // ------------------------------------------------------------------ public landing page
+  'land.nav.sections': 'Sections',
+  'land.nav.how': 'How it works',
+  'land.nav.try': 'Try the engine',
+  'land.nav.security': 'Security',
+  'land.nav.open': 'Open console',
+  'land.preview.sort': 'Highest potential first',
+  'land.preview.caption': 'Illustrative example reports. Scores shown are what the engine returns for these sentences.',
+  'land.video': 'Process plant at dusk',
+  'land.badge': 'SIF precursor intelligence for process industries',
+  'land.h1': 'Score what a safety report could have become, not what it recorded.',
+  'land.lede':
+    'Most near-miss reports end with “no injury”. PRAHARI reads the narrative for the conditions behind serious injuries and fatalities — hazardous energy, a failed control, a person in the line of fire — and puts the reports with real potential at the top of the queue.',
+  'land.reads': 'Reads English, Hindi, Assamese, Bengali and code-mixed reports.',
+  'land.how.sub': 'Four steps, each with an owner. The engine prioritises; people decide.',
+  'land.step1.title': 'Report',
+  'land.step1.body': 'Anyone on site describes what they saw, in their own words and language. Photos optional. No names.',
+  'land.step2.title': 'Score',
+  'land.step2.body':
+    'The server reads the narrative for hazardous energy, failed controls and exposure, and scores its serious-injury potential from 0 to 100.',
+  'land.step3.title': 'Review',
+  'land.step3.body':
+    'HSE officers confirm, escalate, downgrade or dismiss. Every verdict becomes a labelled example the scoring can be checked against.',
+  'land.step4.title': 'Act',
+  'land.step4.body':
+    'Tier 1 and Tier 2 reports open corrective actions with owners and due dates, tracked until they are closed.',
+  'land.try.sub':
+    'This is the same scoring code the server runs, executing in your browser. Nothing you type here is sent or stored.',
+  'land.trust.title': 'Built to be trusted with a safety register',
+  'land.trust.sub': 'A register people are afraid to write in is worse than none. The design decisions follow from that.',
+  'land.trust1.title': 'Server-side scoring',
+  'land.trust1.body':
+    'The score of record is computed by a Cloud Function. Browsers can read the register but cannot write to it.',
+  'land.trust2.title': 'No names on reports',
+  'land.trust2.body': 'A report stores an account ID, never a name. Scores attach to installations and activities, not people.',
+  'land.trust3.title': 'Role-based access',
+  'land.trust3.body':
+    'Reviewer, installation manager, HSE officer and administrator — enforced in the security rules and in every service call.',
+  'land.trust4.title': 'Append-only audit',
+  'land.trust4.body': 'Every verdict, role change and archive is written to an audit log that no one can edit or erase.',
+  'land.start.title': 'Start with your own reports',
+  'land.start.sub': 'New accounts start as Reviewers. An administrator grants wider access.',
+  'land.footer':
+    'PRAHARI scores potential, not probability. It supports the judgement of competent people; it does not replace it.',
+  'demo.examples': 'Examples',
+  'demo.ex.scaffold': 'Scaffold',
+  'demo.ex.gas': 'Gas',
+  'demo.ex.hindi': 'Hindi',
+  'demo.ex.housekeeping': 'Housekeeping',
+  'demo.label': 'Report narrative',
+  'demo.placeholder': 'Describe an unsafe act, unsafe condition or near miss…',
+  'demo.empty': 'Type at least a sentence to see the assessment.',
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof en;

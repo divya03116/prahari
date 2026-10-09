@@ -14,41 +14,45 @@ import {
 
 import { useAuth } from '@/auth/AuthProvider';
 import { Logo } from '@/components/brand';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { buttonClass } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/feedback';
+import { useI18n, type MessageKey } from '@/i18n';
 
 const EngineDemo = lazy(() => import('./landing/EngineDemo'));
 
 function Nav() {
   const { status, verified } = useAuth();
+  const { t } = useI18n();
   const inApp = status === 'signed-in' && verified;
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-canvas/90 backdrop-blur-sm">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
         <Logo />
-        <nav aria-label="Sections" className="hidden items-center gap-5 text-sm text-fg-muted md:flex">
+        <nav aria-label={t('land.nav.sections')} className="hidden items-center gap-5 text-sm text-fg-muted md:flex">
           <a href="#how" className="hover:text-fg">
-            How it works
+            {t('land.nav.how')}
           </a>
           <a href="#try" className="hover:text-fg">
-            Try the engine
+            {t('land.nav.try')}
           </a>
           <a href="#trust" className="hover:text-fg">
-            Security
+            {t('land.nav.security')}
           </a>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <LanguageSwitcher compact className="hidden sm:inline-flex" />
           {inApp ? (
             <Link to="/app" className={buttonClass({ variant: 'primary', size: 'sm' })}>
-              Open console <ArrowRight aria-hidden />
+              {t('land.nav.open')} <ArrowRight aria-hidden />
             </Link>
           ) : (
             <>
               <Link to="/signin" className={buttonClass({ variant: 'ghost', size: 'sm' })}>
-                Sign in
+                {t('auth.signIn')}
               </Link>
               <Link to="/signup" className={buttonClass({ variant: 'primary', size: 'sm' })}>
-                Create account
+                {t('auth.createAccount')}
               </Link>
             </>
           )}
@@ -60,6 +64,8 @@ function Nav() {
 
 /** A static, labelled rendering of the register — built from the real components' styles. */
 function RegisterPreview() {
+  const { t } = useI18n();
+  // Example reports are shown as written; only the frame around them is translated.
   const rows = [
     { score: 81, tier: 1, text: 'Scaffold third lift missing toe boards, fitter working directly below', place: 'Tank farm · Scaffolding' },
     { score: 62, tier: 2, text: 'H2S alarm bypassed on the separator skid while the permit was still open', place: 'Gas gathering · Maintenance' },
@@ -71,8 +77,8 @@ function RegisterPreview() {
   return (
     <figure className="overflow-hidden rounded-lg border border-border bg-surface shadow-overlay">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <span className="text-sm font-medium text-fg">Reports</span>
-        <span className="text-xs text-fg-subtle">Highest potential first</span>
+        <span className="text-sm font-medium text-fg">{t('nav.reports')}</span>
+        <span className="text-xs text-fg-subtle">{t('land.preview.sort')}</span>
       </div>
       <ul className="divide-y divide-border">
         {rows.map((r) => (
@@ -91,13 +97,14 @@ function RegisterPreview() {
         ))}
       </ul>
       <figcaption className="border-t border-border px-4 py-2 text-2xs text-fg-subtle">
-        Illustrative example reports. Scores shown are what the engine returns for these sentences.
+        {t('land.preview.caption')}
       </figcaption>
     </figure>
   );
 }
 
 function FieldVideo() {
+  const { t } = useI18n();
   const ref = useRef<HTMLVideoElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -128,26 +135,33 @@ function FieldVideo() {
       loop
       playsInline
       preload="none"
-      aria-label="Process plant at dusk"
+      aria-label={t('land.video')}
     />
   );
 }
 
-const STEPS = [
-  { icon: <ScrollText />, title: 'Report', body: 'Anyone on site describes what they saw, in their own words and language. Photos optional. No names.' },
-  { icon: <Gauge />, title: 'Score', body: 'The server reads the narrative for hazardous energy, failed controls and exposure, and scores its serious-injury potential from 0 to 100.' },
-  { icon: <ListChecks />, title: 'Review', body: 'HSE officers confirm, escalate, downgrade or dismiss. Every verdict becomes a labelled example the scoring can be checked against.' },
-  { icon: <ClipboardCheck />, title: 'Act', body: 'Tier 1 and Tier 2 reports open corrective actions with owners and due dates, tracked until they are closed.' },
+interface Point {
+  icon: JSX.Element;
+  title: MessageKey;
+  body: MessageKey;
+}
+
+const STEPS: Point[] = [
+  { icon: <ScrollText />, title: 'land.step1.title', body: 'land.step1.body' },
+  { icon: <Gauge />, title: 'land.step2.title', body: 'land.step2.body' },
+  { icon: <ListChecks />, title: 'land.step3.title', body: 'land.step3.body' },
+  { icon: <ClipboardCheck />, title: 'land.step4.title', body: 'land.step4.body' },
 ];
 
-const TRUST = [
-  { icon: <ShieldCheck />, title: 'Server-side scoring', body: 'The score of record is computed by a Cloud Function. Browsers can read the register but cannot write to it.' },
-  { icon: <UserX />, title: 'No names on reports', body: 'A report stores an account ID, never a name. Scores attach to installations and activities, not people.' },
-  { icon: <FileLock2 />, title: 'Role-based access', body: 'Reviewer, installation manager, HSE officer and administrator — enforced in the security rules and in every service call.' },
-  { icon: <ScrollText />, title: 'Append-only audit', body: 'Every verdict, role change and archive is written to an audit log that no one can edit or erase.' },
+const TRUST: Point[] = [
+  { icon: <ShieldCheck />, title: 'land.trust1.title', body: 'land.trust1.body' },
+  { icon: <UserX />, title: 'land.trust2.title', body: 'land.trust2.body' },
+  { icon: <FileLock2 />, title: 'land.trust3.title', body: 'land.trust3.body' },
+  { icon: <ScrollText />, title: 'land.trust4.title', body: 'land.trust4.body' },
 ];
 
 export default function Landing() {
+  const { t } = useI18n();
   return (
     <div className="min-h-dvh">
       <Nav />
@@ -156,26 +170,24 @@ export default function Landing() {
           <div>
             <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-fg-muted">
               <span className="size-1.5 rounded-full bg-signal" aria-hidden />
-              SIF precursor intelligence for process industries
+              {t('land.badge')}
             </p>
             <h1 className="text-3xl font-semibold tracking-[-0.02em] text-fg sm:text-4xl">
-              Score what a safety report could have become, not what it recorded.
+              {t('land.h1')}
             </h1>
             <p className="mt-5 max-w-xl text-md leading-7 text-fg-muted">
-              Most near-miss reports end with “no injury”. PRAHARI reads the narrative for the conditions behind serious
-              injuries and fatalities — hazardous energy, a failed control, a person in the line of fire — and puts the
-              reports with real potential at the top of the queue.
+              {t('land.lede')}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/signup" className={buttonClass({ variant: 'primary', size: 'lg' })}>
-                Create an account <ArrowRight aria-hidden />
+                {t('auth.createAnAccount')} <ArrowRight aria-hidden />
               </Link>
               <a href="#try" className={buttonClass({ variant: 'secondary', size: 'lg' })}>
-                Try the engine
+                {t('land.nav.try')}
               </a>
             </div>
             <p className="mt-6 flex items-center gap-2 text-xs text-fg-subtle">
-              <Languages className="size-3.5" aria-hidden /> Reads English, Hindi, Assamese, Bengali and code-mixed reports.
+              <Languages className="size-3.5" aria-hidden /> {t('land.reads')}
             </p>
           </div>
           <RegisterPreview />
@@ -183,9 +195,9 @@ export default function Landing() {
 
         <section id="how" className="border-t border-border bg-surface/40">
           <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-            <h2 className="text-xl font-semibold tracking-[-0.01em] text-fg">How it works</h2>
+            <h2 className="text-xl font-semibold tracking-[-0.01em] text-fg">{t('land.nav.how')}</h2>
             <p className="mt-2 max-w-2xl text-sm text-fg-muted">
-              Four steps, each with an owner. The engine prioritises; people decide.
+              {t('land.how.sub')}
             </p>
             <ol className="mt-10 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
               {STEPS.map((s, i) => (
@@ -194,8 +206,8 @@ export default function Landing() {
                     {s.icon}
                     <span className="font-mono text-xs">0{i + 1}</span>
                   </div>
-                  <h3 className="text-md font-medium text-fg">{s.title}</h3>
-                  <p className="text-sm leading-6 text-fg-muted">{s.body}</p>
+                  <h3 className="text-md font-medium text-fg">{t(s.title)}</h3>
+                  <p className="text-sm leading-6 text-fg-muted">{t(s.body)}</p>
                 </li>
               ))}
             </ol>
@@ -204,10 +216,9 @@ export default function Landing() {
 
         <section id="try" className="border-t border-border">
           <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-            <h2 className="text-xl font-semibold tracking-[-0.01em] text-fg">Try the engine</h2>
+            <h2 className="text-xl font-semibold tracking-[-0.01em] text-fg">{t('land.nav.try')}</h2>
             <p className="mt-2 max-w-2xl text-sm text-fg-muted">
-              This is the same scoring code the server runs, executing in your browser. Nothing you type here is sent or
-              stored.
+              {t('land.try.sub')}
             </p>
             <div className="mt-8">
               <Suspense fallback={<Skeleton className="h-96 w-full" />}>
@@ -220,17 +231,17 @@ export default function Landing() {
         <section id="trust" className="border-t border-border bg-surface/40">
           <div className="mx-auto grid max-w-6xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_380px]">
             <div>
-              <h2 className="text-xl font-semibold tracking-[-0.01em] text-fg">Built to be trusted with a safety register</h2>
+              <h2 className="text-xl font-semibold tracking-[-0.01em] text-fg">{t('land.trust.title')}</h2>
               <p className="mt-2 max-w-2xl text-sm text-fg-muted">
-                A register people are afraid to write in is worse than none. The design decisions follow from that.
+                {t('land.trust.sub')}
               </p>
               <ul className="mt-10 grid gap-8 sm:grid-cols-2">
-                {TRUST.map((t) => (
-                  <li key={t.title} className="flex gap-3">
-                    <span className="mt-0.5 text-signal [&_svg]:size-4">{t.icon}</span>
+                {TRUST.map((point) => (
+                  <li key={point.title} className="flex gap-3">
+                    <span className="mt-0.5 text-signal [&_svg]:size-4">{point.icon}</span>
                     <div>
-                      <h3 className="text-sm font-medium text-fg">{t.title}</h3>
-                      <p className="mt-1 text-sm leading-6 text-fg-muted">{t.body}</p>
+                      <h3 className="text-sm font-medium text-fg">{t(point.title)}</h3>
+                      <p className="mt-1 text-sm leading-6 text-fg-muted">{t(point.body)}</p>
                     </div>
                   </li>
                 ))}
@@ -243,11 +254,11 @@ export default function Landing() {
         <section className="border-t border-border">
           <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-16 sm:px-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-semibold tracking-[-0.01em] text-fg">Start with your own reports</h2>
-              <p className="mt-1 text-sm text-fg-muted">New accounts start as Reviewers. An administrator grants wider access.</p>
+              <h2 className="text-xl font-semibold tracking-[-0.01em] text-fg">{t('land.start.title')}</h2>
+              <p className="mt-1 text-sm text-fg-muted">{t('land.start.sub')}</p>
             </div>
             <Link to="/signup" className={buttonClass({ variant: 'primary', size: 'lg' })}>
-              Create an account <ArrowRight aria-hidden />
+              {t('auth.createAnAccount')} <ArrowRight aria-hidden />
             </Link>
           </div>
         </section>
@@ -255,11 +266,11 @@ export default function Landing() {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-xs text-fg-subtle sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <Logo />
-          <p>
-            PRAHARI scores potential, not probability. It supports the judgement of competent people; it does not replace
-            it.
-          </p>
+          <div className="flex items-center gap-3">
+            <Logo />
+            <LanguageSwitcher compact />
+          </div>
+          <p>{t('land.footer')}</p>
         </div>
       </footer>
     </div>
