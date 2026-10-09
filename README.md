@@ -164,8 +164,8 @@ digits.
 What a person wrote is **never translated** — narratives, statements and notes are
 shown exactly as written, in whatever language they were written. Still English
 only: text produced by the scoring engine and the server (hazard names, rule
-titles, drafted actions, validation messages), and the Insights, Live monitoring,
-administration and public landing pages. The Hindi, Assamese and Bengali wording
+titles, drafted actions, the server's refusals) and the public landing page. Every
+screen behind sign-in is translated. The Hindi, Assamese and Bengali wording
 was written without a native-speaking safety practitioner and needs that review
 before operational use.
 
@@ -658,10 +658,12 @@ report*.
 format), training, validation, test-set evaluation (precision, recall, mAP50,
 mAP50-95 per class), ONNX export, and the inference service. Heavy files
 (datasets, runs, weights, exports) live in a work folder outside the repository (default
-`E:/prahari-ml`, set `PRAHARI_ML_DIR` to change it). The model trained with this
-recipe (`ppe-v1`, YOLOv8n) scores **precision 0.88, recall 0.78, mAP50 0.83** on
-the held-out test split; per-class results are in `ai/README.md`, with the
-hazard models' results.
+`E:/prahari-ml`, set `PRAHARI_ML_DIR` to change it). The model served by default
+(`ppe-v2`, YOLO26n) scores **precision 0.86, recall 0.77, mAP50 0.82** on the
+held-out test split. It replaced `ppe-v1` (YOLOv8n) to find more boots — boots
+recall 0.58 → 0.72 — with the other classes about where they were; the full
+comparison, per-class results and the hazard models' results are in
+`ai/README.md`.
 
 The inference service (`ai/inference_service/server.py`) is a small HTTP API that
 can run on the same laptop, a GPU server, a cloud VM or an edge device — the web
@@ -725,7 +727,9 @@ time the app, not that cold start.
 - **PPE model scope.** The shipped training recipe uses a public construction-site
   dataset (1,132 training images). How well it works on your cameras depends on
   angle, distance and lighting — label some of your own footage and retrain
-  before relying on it (see `ai/README.md`). It has no harness class yet.
+  before relying on it (see `ai/README.md`). It has no harness class yet, and it
+  still misses more than a quarter of visible boots, so boots and goggles are not
+  required by default.
 - **Monitoring runs in a browser tab**: one camera per tab, and detection pauses
   if the tab or computer sleeps. A 24/7 deployment should keep that machine awake
   or move frame capture to a server next to the cameras.

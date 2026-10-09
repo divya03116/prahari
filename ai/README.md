@@ -4,7 +4,7 @@ The detectors behind live monitoring and photo reports:
 
 | Role | Model | Sees | How it was made |
 |---|---|---|---|
-| `ppe` | `ppe-v1` | people and the PPE they wear | trained here (Construction-PPE) |
+| `ppe` | `ppe-v2` | people and the PPE they wear | trained here (Construction-PPE) |
 | `general` | `general-coco` | people, vehicles, phones, everyday objects | COCO-pretrained YOLOv8n, registered with evidence |
 | `pose` | `pose-coco` | people with 17 body keypoints | COCO-pretrained YOLOv8n-pose, registered with evidence |
 | `fire` | `fire-v1` | fire, smoke | trained here (D-Fire) |
@@ -89,14 +89,23 @@ retrain. Keep the test split untouched so metrics stay comparable.
 ## 2. Training
 
 ```bash
-python ai/ppe/train.py --data E:/prahari-ml/datasets/ppe-v1/data.yaml --model yolov8n.pt \
-  --epochs 100 --batch 8 --workers 0 --patience 20 --device 0 --skip-amp-check --gpu-memory-gb 1.3
+python ai/ppe/balance.py --boost boots=2 goggles=2          # optional: a rebalanced training list
+python ai/ppe/train.py --name ppe-v2 --data E:/prahari-ml/datasets/ppe-v1/data-balanced.yaml --model yolo26n.pt \
+  --epochs 80 --batch 8 --workers 0 --patience 20 --device 0 --skip-amp-check --gpu-memory-gb 1.3
 ```
 
-Starts from COCO-pretrained YOLOv8n, early-stops after `--patience` epochs
-without improvement, and keeps `best.pt` / `last.pt` in
-`<work>/runs/ppe-v1/weights/`. Continue an interrupted run with `--resume`.
-Bigger GPUs: raise `--batch`, use `yolov8s.pt`, drop `--gpu-memory-gb`.
+Starts from a COCO-pretrained nano model (`yolo26n.pt` for `ppe-v2`; `yolov8n.pt`
+was `ppe-v1`), early-stops after `--patience` epochs without improvement, and
+keeps `best.pt` / `last.pt` in `<work>/runs/<name>/weights/`. Continue an
+interrupted run with `--resume`. Any other Ultralytics training setting can be
+passed with `--set KEY=VALUE …` (e.g. `--set lr0=0.003 cos_lr=True`). Bigger
+GPUs: raise `--batch`, use a larger model, drop `--gpu-memory-gb`.
+
+`balance.py` writes `train-balanced.txt` and `data-balanced.yaml`, in which images
+containing the named classes appear more than once (1,724 instead of 1,132
+images per epoch for `boots=2 goggles=2`). It is for a class the model finds
+precisely but too seldom. The validation and test splits are untouched, so
+results stay comparable.
 
 **Small Windows laptops.** On Windows every GPU allocation is also charged to
 the system *commit* (RAM + page file), and a system-managed page file grows onto
@@ -110,34 +119,70 @@ page file to a drive with free space (System Properties → Advanced → Perform
 ## 3. Evaluation
 
 ```bash
-python ai/ppe/evaluate.py --weights E:/prahari-ml/runs/ppe-v1/weights/best.pt
+python ai/ppe/evaluate.py --weights E:/prahari-ml/runs/ppe-v2/weights/best.pt
 ```
 
 Scores the weights on the validation split and on the **held-out test split**
 (never used for training or model selection): precision, recall, mAP50 and
 mAP50-95, overall and per class, written to `<run>/metrics.json`. The inference
-service will not serve weights without it.
+service will not serve weights without it. It runs in batches of 4 with no
+loader processes by default (`--batch`, `--workers`), which fits beside other
+programs on a 4 GB GPU; all numbers below were measured that way.
 
-### Results — `ppe-v1`
+### Results — `ppe-v2` (served by default)
 
-YOLOv8n, 640 px, 100 epochs on an RTX 3050 Laptop GPU (batch 8). Held-out
-**test split** (141 images, 1,032 objects), from `metrics.json`:
+YOLO26n, 640 px, 80 epochs on the rebalanced list (boots and goggles ×2), RTX 3050
+Laptop GPU, batch 8. Held-out **test split** (141 images, 1,032 objects), from
+`metrics.json`:
 
 | Class | Precision | Recall | mAP50 | mAP50-95 |
 |---|---:|---:|---:|---:|
-| **all** | **0.878** | **0.776** | **0.833** | **0.443** |
-| person | 0.857 | 0.812 | 0.844 | 0.493 |
-| helmet | 0.942 | 0.896 | 0.941 | 0.510 |
-| vest | 0.865 | 0.866 | 0.916 | 0.572 |
-| gloves | 0.820 | 0.753 | 0.776 | 0.385 |
-| boots | 0.898 | 0.582 | 0.720 | 0.386 |
-| goggles | 0.886 | 0.748 | 0.804 | 0.311 |
+| **all** | **0.862** | **0.774** | **0.823** | **0.434** |
+| person | 0.828 | 0.784 | 0.815 | 0.481 |
+| helmet | 0.937 | 0.891 | 0.931 | 0.511 |
+| vest | 0.899 | 0.853 | 0.899 | 0.573 |
+| gloves | 0.840 | 0.709 | 0.746 | 0.340 |
+| boots | 0.769 | 0.720 | 0.770 | 0.385 |
+| goggles | 0.900 | 0.690 | 0.777 | 0.315 |
 
-Boots and goggles are small and often partly hidden, so they are missed more
-often (boots recall 0.58) — and to the rule engine a missed item looks like a
-missing one. Before requiring them at a camera, validate on your own footage and
-keep the confirmation settings strict. CPU inference on an 11th-gen Core i5 takes
-~170 ms per frame.
+### What changed from `ppe-v1`, and what did not
+
+`ppe-v2` was made to find more boots. On the same test split and settings:
+
+| Model | all mAP50 | all mAP50-95 | boots precision | boots recall | boots mAP50 |
+|---|---:|---:|---:|---:|---:|
+| `ppe-v1` — YOLOv8n, 100 epochs | 0.831 | 0.441 | 0.891 | 0.580 | 0.716 |
+| `ppe-v1` fine-tuned at 800 px on the rebalanced list, run at 640 px | 0.829 | 0.434 | 0.768 | 0.649 | 0.708 |
+| the same, run at 800 px | 0.833 | 0.438 | 0.787 | 0.666 | 0.736 |
+| **`ppe-v2`** — YOLO26n on the rebalanced list | 0.823 | 0.434 | 0.769 | **0.720** | **0.770** |
+
+- **Boots: better.** `ppe-v2` finds 72% of the boots in the test photos instead
+  of 58%, and its boots mAP50 is 5 points higher. It is also less sure of itself:
+  boots precision fell from 0.89 to 0.77, so it calls more things boots that are
+  not.
+- **Everything else: about the same, slightly lower.** Helmet and vest — the two
+  items required by default — moved by one to two points of mAP50 (0.940 → 0.931,
+  0.916 → 0.899); gloves and goggles by about three (0.776 → 0.746, 0.804 →
+  0.777); overall mAP50 by 0.8 of a point. With 141 test images, differences of
+  this size are within what a different sample of photos would produce; the boots
+  gain is the only change clearly larger than that.
+- **Not a fix for boots.** More than a quarter of visible boots are still missed,
+  and to the rule engine a missed item looks like a missing one. Boots and
+  goggles are small and often partly hidden. Before requiring them at a camera,
+  validate on your own footage and keep the confirmation settings strict. The
+  real improvement will come from labelled footage of your own sites, not from
+  another architecture.
+- Running at a higher resolution alone does not help: `ppe-v1` at 800 px finds
+  no more boots than at 640 px (recall 0.578) and loses accuracy elsewhere.
+
+`ppe-v1` stays usable: point `PPE_WEIGHTS` at
+`<work>/runs/ppe-v1/weights/best.pt` to serve it instead. Its `metrics.json` was
+written with batches of 16 and reads 0.833 mAP50; the 0.831 above is the same
+weights at the batch size used for every row of this comparison. The ONNX export
+(section 5) has been made and checked for `ppe-v1` only.
+
+CPU inference on an 11th-gen Core i5 takes ~170 ms per frame for `ppe-v1`; it was
+not re-measured on CPU for `ppe-v2` (10 ms against 9.5 ms on the laptop GPU).
 
 ## Hazard models
 
@@ -206,7 +251,7 @@ can serve the `.onnx` file too.
 ## Inference service
 
 ```bash
-set PPE_WEIGHTS=E:/prahari-ml/runs/ppe-v1/weights/best.pt
+set PPE_WEIGHTS=E:/prahari-ml/runs/ppe-v2/weights/best.pt
 python ai/inference_service/server.py
 ```
 

@@ -45,6 +45,10 @@ def main() -> None:
     ap.add_argument("--data", type=Path, default=DATASETS / "ppe-v1" / "data.yaml")
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--device", default="0")
+    # Small batches and no loader processes: evaluation then fits beside other
+    # applications on a 4 GB GPU / 8 GB laptop (larger batches fail in cuDNN there).
+    ap.add_argument("--batch", type=int, default=4)
+    ap.add_argument("--workers", type=int, default=0)
     args = ap.parse_args()
 
     configure_ultralytics()
@@ -60,6 +64,7 @@ def main() -> None:
             continue
         r = model.val(
             data=str(args.data), split=split, imgsz=args.imgsz, device=args.device, plots=False, verbose=False,
+            batch=args.batch, workers=args.workers,
             project=str(args.weights.parent.parent), name=f"eval-{split}", exist_ok=True,  # keep outputs with the run
         )
         out[split] = summarise(r, model.names)

@@ -17,7 +17,7 @@ It serves four YOLOv8 models on CPU:
 
 | Role | Weights | Detects |
 |---|---|---|
-| `ppe` | `ppe-v1` (trained for PRAHARI) | people and missing PPE |
+| `ppe` | `ppe-v2` (trained for PRAHARI) | people and missing PPE |
 | `general` | `yolov8n` (COCO, pretrained) | vehicles, phones and other objects for hazard rules |
 | `pose` | `yolov8n-pose` (COCO, pretrained) | body posture |
 | `fire` | `fire-v1` (trained for PRAHARI) | fire and smoke |
