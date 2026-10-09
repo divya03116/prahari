@@ -71,6 +71,15 @@
         ]
       },
       {
+        "source": "/@(icons/**|hero-poster.jpg|hero.mp4|favicon.svg)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=604800"
+          }
+        ]
+      },
+      {
         "source": "/sw.js",
         "headers": [
           {
