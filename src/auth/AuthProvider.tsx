@@ -3,9 +3,11 @@ import { onIdTokenChanged, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { toast } from 'sonner';
 
+import { translate } from '@/i18n';
+import { roleKey } from '@/i18n/labels';
 import { firebase, isConfigured } from '@/lib/firebase';
 import { ensureProfile, signOut as doSignOut, touchLastSeen } from '@/services/auth';
-import { COLLECTIONS, DEFAULT_ROLE, hasRole, ROLE_LABEL, ROLES, type Role, TRUSTED_SIGN_IN_PROVIDERS } from '@/shared/constants';
+import { COLLECTIONS, DEFAULT_ROLE, hasRole, ROLES, type Role, TRUSTED_SIGN_IN_PROVIDERS } from '@/shared/constants';
 import type { UserDoc } from '@/shared/types';
 
 type Status = 'loading' | 'signed-out' | 'signed-in';
@@ -101,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || !profile) return;
     if (profile.disabled) {
-      toast.error('Your account has been disabled by an administrator.');
+      toast.error(translate('account.disabled'));
       void doSignOut();
       return;
     }
@@ -111,12 +113,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .getIdTokenResult(true)
         .then((t) => {
           const next = readRole(t.claims.role);
-          if (next === profile.role) toast.success(`Your role is now ${ROLE_LABEL[next]}.`);
+          if (next === profile.role) toast.success(translate('account.roleNow', { role: translate(roleKey(next)) }));
         })
         .catch(() => {
           // Role changes revoke existing sessions server-side; sign in again
           // to receive a token carrying the new role.
-          toast.info('Your access level changed. Sign in again to continue.');
+          toast.info(translate('account.roleChanged'));
           void doSignOut();
         })
         .finally(() => {

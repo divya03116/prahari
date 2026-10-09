@@ -5,6 +5,8 @@
  * camera needs a gateway (e.g. MediaMTX or go2rtc) that serves MJPEG/MP4/HLS.
  */
 
+import { translate } from '@/i18n';
+
 export type CameraChoice =
   | { kind: 'device'; deviceId: string }
   | { kind: 'facing'; facingMode: 'environment' | 'user' }
@@ -41,25 +43,26 @@ export function stopStream(stream: MediaStream | null): void {
 }
 
 /** A sentence a person can act on, for every way opening a camera can fail. */
+/** In the interface language (src/i18n). */
 export function describeCameraError(err: unknown): string {
   const name = (err as { name?: string } | null)?.name ?? '';
   switch (name) {
     case 'NotAllowedError':
     case 'PermissionDeniedError':
-      return 'Camera permission was blocked. Allow the camera for this site in the browser’s address-bar settings (on a phone, the browser app also needs camera permission in the phone’s settings), then press Start camera.';
+      return translate('cam.blocked');
     case 'NotFoundError':
     case 'DevicesNotFoundError':
-      return 'No camera was found. Connect a camera, or choose another source.';
+      return translate('cam.notFound');
     case 'NotReadableError':
     case 'TrackStartError':
-      return 'The camera is busy — another application may be using it. Close it and try again.';
+      return translate('cam.busy');
     case 'OverconstrainedError':
-      return 'This camera cannot provide the requested video. Choose another camera.';
+      return translate('cam.overconstrained');
     case 'SecurityError':
-      return 'The browser blocked camera access. Open the site over HTTPS (or on localhost).';
+      return translate('cam.security');
     case 'AbortError':
-      return 'The camera stopped unexpectedly. Try again.';
+      return translate('cam.aborted');
     default:
-      return 'The camera could not be started.';
+      return translate('cam.failed');
   }
 }

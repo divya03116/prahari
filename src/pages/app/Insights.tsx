@@ -11,12 +11,14 @@ import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
 import { Tooltip } from '@/components/ui/menu';
 import { useAsync } from '@/hooks/data';
 import { useReference } from '@/hooks/reference';
+import { rich, useI18n } from '@/i18n';
+import { verdictKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { formatShortDate } from '@/lib/format';
 import { heatFromReports, heatSince, lastNDays } from '@/services/directory';
 import { recentScored } from '@/services/reports';
 import { scopeKey } from '@/services/scope';
-import { VERDICT_LABEL, VERDICTS } from '@/shared/constants';
+import { VERDICTS } from '@/shared/constants';
 import type { ReportDoc, WithId } from '@/shared/types';
 
 const HEAT_DAYS = 14;
@@ -29,6 +31,7 @@ function heatColor(peak: number): string {
 }
 
 function HeatGrid() {
+  const { t } = useI18n();
   const { profile } = useAuth();
   const { installations } = useReference();
   // Officers read the site-wide roll-up; everyone else's grid comes from their own reports.
@@ -58,8 +61,8 @@ function HeatGrid() {
   return (
     <Panel>
       <PanelHeader
-        title="Heat by installation"
-        description={`Peak SIF potential per day · last ${HEAT_DAYS} days`}
+        title={t('insights.heat.title')}
+        description={t('insights.heat.desc', { days: HEAT_DAYS })}
         actions={
           <div className="hidden items-center gap-3 text-xs text-fg-subtle sm:flex">
             <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-[2px] bg-critical" />≥ 70</span>
@@ -75,14 +78,14 @@ function HeatGrid() {
       ) : heat.error ? (
         <ErrorState message={heat.error} onRetry={heat.reload} />
       ) : !rows.length ? (
-        <EmptyState title="No installations yet" description="An administrator adds installations under Reference data." />
+        <EmptyState title={t('insights.noInstallations')} description={t('insights.noInstallationsDesc')} />
       ) : (
         <div className="overflow-x-auto p-4">
           <table className="w-full min-w-[640px] border-separate border-spacing-1 text-xs">
             <thead>
               <tr>
                 <th scope="col" className="w-44 text-left font-medium text-fg-subtle">
-                  Installation
+                  {t('reports.installation')}
                 </th>
                 {days.map((d, i) => (
                   <th key={d} scope="col" className="font-normal text-fg-subtle">
@@ -105,10 +108,16 @@ function HeatGrid() {
                   {r.cells.map((c, i) =>
                     c ? (
                       <td key={i} className="p-0">
-                        <Tooltip content={`${formatShortDate(new Date(`${c.day}T00:00:00Z`))}: peak ${c.peak}, ${c.count} report${c.count === 1 ? '' : 's'}`}>
+                        <Tooltip
+                          content={t('insights.cell', {
+                            date: formatShortDate(new Date(`${c.day}T00:00:00Z`)),
+                            peak: c.peak,
+                            reports: t(c.count === 1 ? 'dash.reportCount.one' : 'dash.reportCount.many', { count: c.count }),
+                          })}
+                        >
                           <div
                             tabIndex={0}
-                            aria-label={`${r.name}, ${c.day}: peak ${c.peak}, ${c.count} reports`}
+                            aria-label={t('insights.cellLabel', { name: r.name, date: c.day, peak: c.peak, count: c.count })}
                             className="flex h-7 items-center justify-center rounded-[3px] font-medium text-fg tabular"
                             style={{ background: heatColor(c.peak) }}
                           >
@@ -175,7 +184,8 @@ function analysePatterns(reports: WithId<ReportDoc>[]) {
 }
 
 function RankList({ items, total }: { items: { key: string; label: string; count: number }[]; total: number }) {
-  if (!items.length) return <p className="text-sm text-fg-subtle">Nothing detected yet.</p>;
+  const { t } = useI18n();
+  if (!items.length) return <p className="text-sm text-fg-subtle">{t('insights.nothing')}</p>;
   const max = items[0].count;
   return (
     <ul className="flex flex-col gap-3">
@@ -197,6 +207,7 @@ function RankList({ items, total }: { items: { key: string; label: string; count
 }
 
 export default function Insights() {
+  const { t } = useI18n();
   const scope = useReportScope();
   const sample = useAsync(() => recentScored(SAMPLE, scope), [scopeKey(scope)]);
   const patterns = useMemo(() => analysePatterns(sample.data ?? []), [sample.data]);
@@ -206,12 +217,8 @@ export default function Insights() {
   return (
     <>
       <PageHeader
-        title="Insights"
-        description={
-          scope.kind === 'own'
-            ? 'Patterns in the reports you have filed: where serious-injury potential concentrates, and what keeps recurring.'
-            : 'Where serious-injury potential is concentrating, and which combinations of hazard and failed control keep recurring.'
-        }
+        title={t('nav.insights')}
+        description={scope.kind === 'own' ? t('insights.desc.own') : t('insights.desc.all')}
       />
 
       <div className="flex flex-col gap-6">
@@ -228,17 +235,17 @@ export default function Insights() {
           </Panel>
         ) : n === 0 ? (
           <Panel>
-            <EmptyState icon={<LineChart />} title="Not enough data yet" description="Patterns appear once reports have been scored." />
+            <EmptyState icon={<LineChart />} title={t('insights.notEnough')} description={t('insights.notEnoughDesc')} />
           </Panel>
         ) : (
           <>
             <p className="-mb-3 text-xs text-fg-subtle">
-              Based on the {n} most recent scored reports{n === SAMPLE ? ` (a bounded sample, to keep this page to ${SAMPLE} reads)` : ''}.
+              {n === SAMPLE ? t('insights.basedOnBounded', { n, max: SAMPLE }) : t('insights.basedOn', { n })}
             </p>
             <Panel>
               <PanelHeader
-                title="Recurring signatures"
-                description="The same hazardous energy meeting the same failed control, more than once"
+                title={t('insights.signatures')}
+                description={t('insights.signaturesDesc')}
               />
               {patterns.signatures.length ? (
                 <ul className="divide-y divide-border">
@@ -246,41 +253,39 @@ export default function Insights() {
                     <li key={s.key} className="flex items-center justify-between gap-4 px-4 py-2.5 text-sm">
                       <span className="min-w-0 truncate text-fg">{s.label}</span>
                       <span className="flex shrink-0 items-center gap-4 text-xs text-fg-subtle tabular">
-                        <span>
-                          <span className="text-sm text-fg">{s.count}</span> reports
-                        </span>
+                        <span>{rich(t('insights.countReports'), { count: <span className="text-sm text-fg">{s.count}</span> })}</span>
                         <span className={cn('w-16 text-right', s.avg >= 70 ? 'text-critical' : s.avg >= 40 ? 'text-warning' : 'text-success')}>
-                          avg {s.avg}
+                          {t('insights.avg', { avg: s.avg })}
                         </span>
                       </span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="px-4 py-6 text-sm text-fg-subtle">No combination has recurred yet.</p>
+                <p className="px-4 py-6 text-sm text-fg-subtle">{t('insights.noRecurrence')}</p>
               )}
             </Panel>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <Panel>
-                <PanelHeader title="Dominant energy sources" />
+                <PanelHeader title={t('insights.energy')} />
                 <PanelBody>
                   <RankList items={patterns.energy} total={n} />
                 </PanelBody>
               </Panel>
               <Panel>
-                <PanelHeader title="Most frequently failed controls" />
+                <PanelHeader title={t('insights.controls')} />
                 <PanelBody>
                   <RankList items={patterns.barrier} total={n} />
                 </PanelBody>
               </Panel>
               <Panel>
-                <PanelHeader title="Officer verdicts" description={`${reviewed} of ${n} reviewed · ${patterns.rules} life-saving rule breaches`} />
+                <PanelHeader title={t('insights.verdicts')} description={t('insights.verdictsDesc', { reviewed, n, rules: patterns.rules })} />
                 <PanelBody>
                   {reviewed ? (
                     <ProportionBars
                       rows={VERDICTS.map((v) => ({
-                        label: VERDICT_LABEL[v],
+                        label: t(verdictKey(v)),
                         value: patterns.verdicts.get(v) ?? 0,
                         color:
                           v === 'confirmed'
@@ -293,7 +298,7 @@ export default function Insights() {
                       }))}
                     />
                   ) : (
-                    <p className="text-sm text-fg-subtle">No verdicts recorded in this sample.</p>
+                    <p className="text-sm text-fg-subtle">{t('insights.noVerdicts')}</p>
                   )}
                 </PanelBody>
               </Panel>

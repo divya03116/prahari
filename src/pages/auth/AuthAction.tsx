@@ -15,6 +15,7 @@ import { PasswordInput } from '@/components/PasswordInput';
 import { Button, buttonClass } from '@/components/ui/button';
 import { Alert, Spinner } from '@/components/ui/feedback';
 import { Field } from '@/components/ui/field';
+import { translate, useI18n } from '@/i18n';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { errorMessage } from '@/lib/errors';
 import { applyCode, confirmReset, inspectActionCode, verifyResetCode } from '@/services/auth';
@@ -32,6 +33,7 @@ export default function AuthAction() {
   const code = params.get('oobCode') ?? '';
   const [state, setState] = useState<State>({ kind: 'working' });
   const { user, refresh } = useAuth();
+  const { t } = useI18n();
   const started = useRef(false);
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export default function AuthAction() {
       switch (mode) {
         case 'verifyEmail':
           await applyCode(code);
-          setState({ kind: 'done', title: 'Email verified', body: 'Your address is confirmed. You now have access to PRAHARI.' });
+          setState({ kind: 'done', title: translate('link.verified.title'), body: translate('link.verified.body') });
           return;
         case 'resetPassword': {
           const email = await verifyResetCode(code);
@@ -55,13 +57,13 @@ export default function AuthAction() {
           await applyCode(code);
           setState({
             kind: 'done',
-            title: 'Email address restored',
-            body: `Your sign-in email is ${info.data.email ?? 'restored'} again. If you did not request the change, reset your password now.`,
+            title: translate('link.restored.title'),
+            body: translate('link.restored.body', { email: info.data.email ?? translate('link.restored.fallback') }),
           });
           return;
         }
         default:
-          setState({ kind: 'failed', message: 'This link is not recognised.' });
+          setState({ kind: 'failed', message: translate('link.unknown') });
       }
     })().catch((err) => setState({ kind: 'failed', message: errorMessage(err) }));
   }, [mode, code]);
@@ -73,9 +75,9 @@ export default function AuthAction() {
 
   if (state.kind === 'working') {
     return (
-      <AuthLayout title="One moment">
+      <AuthLayout title={t('link.wait')}>
         <div className="flex items-center gap-3 text-sm text-fg-muted">
-          <Spinner /> Checking your link…
+          <Spinner /> {t('link.checking')}
         </div>
       </AuthLayout>
     );
@@ -85,17 +87,17 @@ export default function AuthAction() {
 
   if (state.kind === 'failed') {
     return (
-      <AuthLayout title="This link cannot be used">
+      <AuthLayout title={t('link.unusable')}>
         <div className="flex gap-3 rounded-md border border-critical-line bg-critical-soft p-4">
           <XCircle className="mt-0.5 size-5 shrink-0 text-critical" aria-hidden />
           <p className="text-sm text-fg-muted">{state.message}</p>
         </div>
         <div className="mt-6 flex gap-2">
           <Link to="/signin" className={buttonClass({ variant: 'primary' })}>
-            Sign in
+            {t('auth.signIn')}
           </Link>
           <Link to="/forgot-password" className={buttonClass()}>
-            Request a new reset link
+            {t('link.newReset')}
           </Link>
         </div>
       </AuthLayout>
@@ -109,7 +111,7 @@ export default function AuthAction() {
         <p className="text-sm text-fg-muted">{state.body}</p>
       </div>
       <Link to={user ? '/app' : '/signin?verified=1'} className={buttonClass({ variant: 'primary', size: 'lg', className: 'mt-6 w-full' })}>
-        {user ? 'Continue to PRAHARI' : 'Sign in'}
+        {user ? t('link.continue') : t('auth.signIn')}
       </Link>
     </AuthLayout>
   );
@@ -117,6 +119,7 @@ export default function AuthAction() {
 
 function ResetForm({ code, email }: { code: string; email: string }) {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const {
     register,
@@ -135,17 +138,17 @@ function ResetForm({ code, email }: { code: string; email: string }) {
   });
 
   return (
-    <AuthLayout title="Choose a new password" description={<>For {email}</>}>
+    <AuthLayout title={t('link.reset.title')} description={t('link.reset.for', { email })}>
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {error && <Alert tone="critical">{error}</Alert>}
-        <Field label="New password" error={errors.password?.message} hint="At least 8 characters, with a letter and a number.">
+        <Field label={t('link.newPassword')} error={errors.password?.message} hint={t('auth.passwordHint')}>
           <PasswordInput autoComplete="new-password" autoFocus {...register('password')} />
         </Field>
-        <Field label="Confirm new password" error={errors.confirm?.message}>
+        <Field label={t('link.confirmPassword')} error={errors.confirm?.message}>
           <PasswordInput autoComplete="new-password" {...register('confirm')} />
         </Field>
         <Button type="submit" variant="primary" size="lg" loading={isSubmitting} className="w-full">
-          Update password
+          {t('link.updatePassword')}
         </Button>
       </form>
     </AuthLayout>

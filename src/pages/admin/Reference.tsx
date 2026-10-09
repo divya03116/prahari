@@ -16,6 +16,7 @@ import { PageHeader, Segmented } from '@/components/ui/misc';
 import { Panel } from '@/components/ui/panel';
 import { Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { useReference } from '@/hooks/reference';
+import { useI18n } from '@/i18n';
 import { errorMessage } from '@/lib/errors';
 import { formatDate } from '@/lib/format';
 import { api } from '@/services/callables';
@@ -24,8 +25,6 @@ import type { ReferenceDoc, WithId } from '@/shared/types';
 
 type FormIn = z.input<typeof referenceFieldsSchema>;
 type FormOut = z.output<typeof referenceFieldsSchema>;
-
-const NOUN: Record<ReferenceKind, string> = { installations: 'installation', activities: 'activity' };
 
 function EditDialog({
   kind,
@@ -38,6 +37,7 @@ function EditDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const {
     register,
@@ -62,7 +62,7 @@ function EditDialog({
     try {
       // Omit `id` on create: callables serialise undefined as null.
       await api.upsertReference({ ...v, kind, ...(item ? { id: item.id } : {}) });
-      toast.success(item ? `${v.name} updated` : `${v.name} added`);
+      toast.success(t(item ? 'ref.updated' : 'ref.added', { name: v.name }));
       onOpenChange(false);
     } catch (err) {
       setError(errorMessage(err));
@@ -73,38 +73,38 @@ function EditDialog({
     <Modal
       open={open}
       onOpenChange={(o) => !isSubmitting && onOpenChange(o)}
-      title={item ? `Edit ${NOUN[kind]}` : `Add ${NOUN[kind]}`}
+      title={t(item ? `ref.edit.${kind}` : `ref.add.${kind}`)}
       size="sm"
       onSubmit={submit}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" variant="primary" loading={isSubmitting}>
-            {item ? 'Save changes' : `Add ${NOUN[kind]}`}
+            {item ? t('action.saveChanges') : t(`ref.add.${kind}`)}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
         {error && <Alert tone="critical">{error}</Alert>}
-        <Field label="Name" error={errors.name?.message}>
+        <Field label={t('ref.name')} error={errors.name?.message}>
           <Input autoFocus {...register('name')} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Code" optional error={errors.code?.message}>
+          <Field label={t('ref.code')} optional error={errors.code?.message}>
             <Input className="font-mono" maxLength={16} {...register('code')} />
           </Field>
-          <Field label={kind === 'installations' ? 'Region' : 'Category'} optional error={errors.region?.message}>
+          <Field label={kind === 'installations' ? t('ref.region') : t('ref.category')} optional error={errors.region?.message}>
             <Input {...register('region')} />
           </Field>
         </div>
         <label className="flex cursor-pointer items-start gap-2.5 text-sm">
           <Checkbox className="mt-0.5" {...register('active')} />
           <span>
-            <span className="block text-fg">Active</span>
-            <span className="block text-xs text-fg-subtle">Inactive entries stay on existing reports but cannot be chosen for new ones.</span>
+            <span className="block text-fg">{t('users.active')}</span>
+            <span className="block text-xs text-fg-subtle">{t('ref.activeHint')}</span>
           </span>
         </label>
       </div>
@@ -113,6 +113,7 @@ function EditDialog({
 }
 
 export default function Reference() {
+  const { t } = useI18n();
   const [params, setParams] = useSearchParams();
   const kind: ReferenceKind = params.get('tab') === 'activities' ? 'activities' : 'installations';
   const ref = useReference();
@@ -123,7 +124,7 @@ export default function Reference() {
   const toggle = async (item: WithId<ReferenceDoc>) => {
     try {
       await api.upsertReference({ kind, id: item.id, name: item.name, code: item.code, region: item.region, active: !item.active });
-      toast.success(`${item.name} ${item.active ? 'deactivated' : 'activated'}`);
+      toast.success(t(item.active ? 'ref.deactivated' : 'ref.activated', { name: item.name }));
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -132,23 +133,23 @@ export default function Reference() {
   return (
     <>
       <PageHeader
-        title="Reference data"
-        description="The installations and activities people choose from when filing a report."
+        title={t('nav.reference')}
+        description={t('ref.description')}
         actions={
           <Button variant="primary" onClick={() => setEditing({ item: null })}>
-            <Plus aria-hidden /> Add {NOUN[kind]}
+            <Plus aria-hidden /> {t(`ref.add.${kind}`)}
           </Button>
         }
       />
 
       <div className="mb-3">
         <Segmented
-          label="Reference type"
+          label={t('ref.typeLabel')}
           value={kind}
           onChange={(v) => setParams(v === 'installations' ? {} : { tab: v }, { replace: true })}
           options={[
-            { value: 'installations', label: 'Installations', count: ref.installations.length },
-            { value: 'activities', label: 'Activities', count: ref.activities.length },
+            { value: 'installations', label: t('ref.installations'), count: ref.installations.length },
+            { value: 'activities', label: t('ref.activities'), count: ref.activities.length },
           ]}
         />
       </div>
@@ -161,11 +162,11 @@ export default function Reference() {
         ) : !items.length ? (
           <EmptyState
             icon={<Building2 />}
-            title={`No ${kind} yet`}
-            description={`Reports cannot be filed until at least one ${NOUN[kind]} exists.`}
+            title={t(`ref.none.${kind}`)}
+            description={t(`ref.noneDesc.${kind}`)}
             action={
               <Button size="sm" variant="primary" onClick={() => setEditing({ item: null })}>
-                Add {NOUN[kind]}
+                {t(`ref.add.${kind}`)}
               </Button>
             }
           />
@@ -173,13 +174,13 @@ export default function Reference() {
           <Table>
             <THead>
               <tr>
-                <TH>Name</TH>
-                <TH className="hidden sm:table-cell">Code</TH>
-                <TH className="hidden md:table-cell">{kind === 'installations' ? 'Region' : 'Category'}</TH>
-                <TH>Status</TH>
-                <TH className="hidden lg:table-cell">Updated</TH>
+                <TH>{t('ref.name')}</TH>
+                <TH className="hidden sm:table-cell">{t('ref.code')}</TH>
+                <TH className="hidden md:table-cell">{kind === 'installations' ? t('ref.region') : t('ref.category')}</TH>
+                <TH>{t('action.status')}</TH>
+                <TH className="hidden lg:table-cell">{t('ref.updatedCol')}</TH>
                 <TH className="w-12">
-                  <span className="sr-only">Manage</span>
+                  <span className="sr-only">{t('users.manage')}</span>
                 </TH>
               </tr>
             </THead>
@@ -189,25 +190,25 @@ export default function Reference() {
                   <TD className="text-fg">{i.name}</TD>
                   <TD className="hidden font-mono text-xs sm:table-cell">{i.code || '—'}</TD>
                   <TD className="hidden md:table-cell">{i.region || '—'}</TD>
-                  <TD>{i.active ? <Badge tone="success" dot>Active</Badge> : <Badge>Inactive</Badge>}</TD>
+                  <TD>{i.active ? <Badge tone="success" dot>{t('users.active')}</Badge> : <Badge>{t('ref.inactive')}</Badge>}</TD>
                   <TD className="hidden whitespace-nowrap lg:table-cell">{formatDate(i.updatedAt)}</TD>
                   <TD className="text-right">
                     <Menu>
                       <MenuTrigger asChild>
-                        <Button size="icon-sm" variant="ghost" aria-label={`Manage ${i.name}`}>
+                        <Button size="icon-sm" variant="ghost" aria-label={t('users.manageItem', { name: i.name })}>
                           <MoreHorizontal aria-hidden />
                         </Button>
                       </MenuTrigger>
                       <MenuContent>
                         <MenuItem icon={<Pencil />} onSelect={() => setEditing({ item: i })}>
-                          Edit
+                          {t('common.edit')}
                         </MenuItem>
                         <MenuItem icon={<Power />} onSelect={() => void toggle(i)}>
-                          {i.active ? 'Deactivate' : 'Activate'}
+                          {i.active ? t('ref.deactivate') : t('ref.activate')}
                         </MenuItem>
                         <MenuSeparator />
                         <MenuItem icon={<Trash2 />} danger onSelect={() => setDeleting(i)}>
-                          Delete
+                          {t('ref.delete')}
                         </MenuItem>
                       </MenuContent>
                     </Menu>
@@ -223,13 +224,13 @@ export default function Reference() {
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(o) => !o && setDeleting(null)}
-        title={`Delete ${deleting?.name ?? ''}?`}
-        description={`Only an ${NOUN[kind]} that no report refers to can be deleted. If reports use it, deactivate it instead — it will stay on those reports but disappear from the form.`}
-        confirmLabel="Delete"
+        title={t('ref.delete.title', { name: deleting?.name ?? '' })}
+        description={t(`ref.deleteDesc.${kind}`)}
+        confirmLabel={t('ref.delete')}
         onConfirm={async () => {
           if (!deleting) return;
           await api.deleteReference(kind, deleting.id);
-          toast.success(`${deleting.name} deleted`);
+          toast.success(t('ref.deleted', { name: deleting.name }));
         }}
       />
     </>
