@@ -21,7 +21,7 @@ REPO = HERE.parents[1]
 
 # (folder inside the Space, run folder under the ML directory, weights file)
 MODELS = [
-    ("ppe-v1", "runs/ppe-v1", "best.pt"),
+    ("ppe-v2", "runs/ppe-v2", "best.pt"),
     ("fire-v1", "runs/fire-v1", "best.pt"),
     ("general-coco", "models/general-coco", "yolov8n.pt"),
     ("pose-coco", "models/pose-coco", "yolov8n-pose.pt"),

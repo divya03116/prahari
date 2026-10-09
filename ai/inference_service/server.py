@@ -7,7 +7,7 @@ server, a cloud VM or an edge box — the app only needs its URL
 (VITE_PPE_INFERENCE_URL).
 
 Models, each optional and each served only if it has evaluation metrics:
-    ppe      helmet, vest, gloves, boots, goggles + person   (trained: ppe-v1)
+    ppe      helmet, vest, gloves, boots, goggles + person   (trained: ppe-v2)
     general  COCO objects: people, vehicles, phones, objects (pretrained)
     pose     people with 17 body keypoints                   (pretrained)
     fire     fire and smoke                                  (trained: fire-v1)
@@ -53,6 +53,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -64,7 +65,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ppe"))
 
 ROLES = {
     # role: (environment variable, default weights)
-    "ppe": ("PPE_WEIGHTS", "E:/prahari-ml/runs/ppe-v1/weights/best.pt"),
+    "ppe": ("PPE_WEIGHTS", "E:/prahari-ml/runs/ppe-v2/weights/best.pt"),
     "general": ("GENERAL_WEIGHTS", "E:/prahari-ml/models/general-coco/weights/yolov8n.pt"),
     "pose": ("POSE_WEIGHTS", "E:/prahari-ml/models/pose-coco/weights/yolov8n-pose.pt"),
     "fire": ("FIRE_WEIGHTS", "E:/prahari-ml/runs/fire-v1/weights/best.pt"),
@@ -102,6 +103,15 @@ def evaluation(weights: Path) -> tuple[str, dict | None]:
     return weights.parent.parent.name, metrics
 
 
+def architecture(model) -> str:
+    """The model family, from the definition file the checkpoint records
+    (yolo26n.yaml -> YOLO26). Checkpoints that record none are the YOLOv8 runs
+    this service started with."""
+    source = str((getattr(model.model, "yaml", None) or {}).get("yaml_file") or "")
+    found = re.search(r"yolo(v?)(\d+)", Path(source).name.lower())
+    return f"YOLO{found.group(1)}{found.group(2)}" if found else "YOLOv8"
+
+
 def load_models() -> None:
     """Loads every configured model once. A model that cannot be served is
     reported with the reason; the others still work."""
@@ -133,7 +143,7 @@ def load_models() -> None:
             _infos[role] = {
                 "role": role,
                 "name": name,
-                "architecture": "YOLOv8",
+                "architecture": architecture(model),
                 "weights": path.name,
                 "classes": names,
                 "keypoints": getattr(model, "task", "") == "pose",
