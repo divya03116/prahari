@@ -4,12 +4,14 @@
  * A report is created by the submitReport callable with status 'pending'. This
  * trigger assesses it, opens corrective actions for Tier 1 and 2, and maintains
  * the two roll-ups the dashboards read (per-installation heat, daily totals),
- * so no screen ever has to scan the whole register to draw a chart.
+ * so no screen ever has to scan the whole register to draw a chart. A Tier 1
+ * result also alerts the people who must act (lib/alerts.ts).
  */
 
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions';
 
+import { alertTier1 } from '../lib/alerts.js';
 import { db, dayKey, FieldValue } from '../lib/core.js';
 import { addToHeat, bumpDaily, openEngineActions } from '../lib/rollups.js';
 import { COLLECTIONS } from '../shared/constants.js';
@@ -110,6 +112,10 @@ export const scoreReport = onDocumentCreated(`${COLLECTIONS.reports}/{reportId}`
     await addToHeat(installationId, installationName, day, result.score);
 
     logger.info('scored', { reportId: ref.id, score: result.score, tier: result.tier });
+
+    // After everything else: alertTier1 never throws, so a provider that is
+    // down cannot turn a scored report into a failed one.
+    await alertTier1(ref.id, report, result, capa[0]?.control ?? null);
   } catch (err) {
     // Never leave a report stuck on 'pending' — a queue that silently swallows
     // reports is more dangerous than one that shows a failure.

@@ -649,6 +649,29 @@ export const en = {
   'settings.installIos': 'In Safari, tap Share, then “Add to Home Screen”.',
   'settings.installOther': 'Open your browser’s menu and choose “Install app” or “Add to Home screen”.',
   'settings.installDone': 'PRAHARI was installed',
+
+  // ------------------------------------------------------------------ Tier 1 alerts
+  'alerts.title': 'Tier 1 alerts',
+  'alerts.description':
+    'Be told at once when a report is scored Tier 1 · Critical. HSE officers and administrators are alerted for every installation, managers for their own.',
+  'alerts.whatsappNumber': 'WhatsApp number',
+  'alerts.whatsappHint': 'With the country code, e.g. +91 98765 43210.',
+  'alerts.numberInvalid': 'Enter the number with its country code, e.g. +91 98765 43210.',
+  'alerts.numberRequired': 'Enter a WhatsApp number to receive alerts there.',
+  'alerts.noEmailOnAccount': 'This account has no email address.',
+  'alerts.emailNotSetUp': 'Email alerts are not set up on the server yet, so none will be sent.',
+  'alerts.whatsappNotSetUp': 'WhatsApp alerts are not set up on the server yet, so none will be sent.',
+  'alerts.saved': 'Alert settings saved',
+  'alerts.sendTest': 'Send me a test alert',
+  'alerts.testDone': 'Test alert',
+  'alerts.row': 'Alerts',
+  'alerts.status.sent': 'sent to {sent}',
+  'alerts.status.partial': '{sent} sent, {failed} failed',
+  'alerts.status.failed': 'could not be sent',
+  'alerts.status.notConfigured': 'not set up',
+  'alerts.status.noRecipients': 'nobody to send to',
+  'alerts.status.sending': 'sending…',
+  'alerts.status.none': 'No alert was sent for this report.',
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof en;

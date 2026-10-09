@@ -647,4 +647,27 @@ export const hi: Record<MessageKey, string> = {
   'settings.installIos': 'Safari में Share दबाएँ, फिर “Add to Home Screen” चुनें।',
   'settings.installOther': 'अपने ब्राउज़र का मेनू खोलें और “Install app” या “Add to Home screen” चुनें।',
   'settings.installDone': 'PRAHARI इंस्टॉल हो गया',
+
+  // Tier 1 alerts
+  'alerts.title': 'टियर 1 अलर्ट',
+  'alerts.description':
+    'जब किसी रिपोर्ट का आकलन टियर 1 · गंभीर हो, तुरंत सूचना पाएँ। HSE अधिकारियों और प्रशासकों को हर इंस्टॉलेशन के लिए, प्रबंधकों को अपने इंस्टॉलेशन के लिए अलर्ट मिलता है।',
+  'alerts.whatsappNumber': 'WhatsApp नंबर',
+  'alerts.whatsappHint': 'देश कोड के साथ, जैसे +91 98765 43210।',
+  'alerts.numberInvalid': 'नंबर देश कोड के साथ दर्ज करें, जैसे +91 98765 43210।',
+  'alerts.numberRequired': 'WhatsApp पर अलर्ट पाने के लिए नंबर दर्ज करें।',
+  'alerts.noEmailOnAccount': 'इस खाते में ईमेल पता नहीं है।',
+  'alerts.emailNotSetUp': 'सर्वर पर ईमेल अलर्ट अभी सेट नहीं हैं, इसलिए कोई ईमेल नहीं भेजा जाएगा।',
+  'alerts.whatsappNotSetUp': 'सर्वर पर WhatsApp अलर्ट अभी सेट नहीं हैं, इसलिए कोई संदेश नहीं भेजा जाएगा।',
+  'alerts.saved': 'अलर्ट सेटिंग्स सहेजी गईं',
+  'alerts.sendTest': 'मुझे टेस्ट अलर्ट भेजें',
+  'alerts.testDone': 'टेस्ट अलर्ट',
+  'alerts.row': 'अलर्ट',
+  'alerts.status.sent': '{sent} को भेजा गया',
+  'alerts.status.partial': '{sent} भेजे गए, {failed} विफल',
+  'alerts.status.failed': 'भेजा नहीं जा सका',
+  'alerts.status.notConfigured': 'सेट नहीं है',
+  'alerts.status.noRecipients': 'भेजने के लिए कोई नहीं',
+  'alerts.status.sending': 'भेजा जा रहा है…',
+  'alerts.status.none': 'इस रिपोर्ट के लिए कोई अलर्ट नहीं भेजा गया।',
 };

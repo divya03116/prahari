@@ -16,8 +16,10 @@ import type {
   UpsertReferenceInput,
   ReferenceKind,
   StatementInput,
+  AlertSettings,
 } from '@/shared/schemas';
 import type { hazardIncidentSchema, ppeIncidentSchema, submitReportSchema } from '@/shared/schemas';
+import type { AlertChannelResult } from '@/shared/types';
 import type { z } from 'zod';
 
 type PpeIncidentPayload = z.input<typeof ppeIncidentSchema>;
@@ -61,4 +63,12 @@ export const api = {
   createHazardIncident: (d: HazardIncidentPayload) =>
     call<HazardIncidentPayload, { deduplicated: boolean; reportId: string | null; type?: string }>('createHazardIncident', d),
   addStatement: (d: StatementInput) => call<StatementInput, Ok & { id: string }>('addStatement', d),
+
+  getAlertSettings: () =>
+    call<Record<string, never>, { eligible: boolean; settings: AlertSettings; channels: { email: boolean; whatsapp: boolean } }>(
+      'getAlertSettings',
+      {},
+    ),
+  setAlertSettings: (d: AlertSettings) => call<AlertSettings, Ok>('setAlertSettings', d),
+  sendTestAlert: () => call<Record<string, never>, { email: AlertChannelResult; whatsapp: AlertChannelResult }>('sendTestAlert', {}),
 };

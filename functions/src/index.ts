@@ -17,3 +17,4 @@ export { createAction, updateAction, deleteAction } from './callables/actions.js
 export { setUserRole, setUserDisabled, setUserInstallation, deleteUser, claimFirstAdmin } from './callables/users.js';
 export { upsertReference, deleteReference } from './callables/reference.js';
 export { createPpeIncident, createHazardIncident, addStatement } from './callables/incidents.js';
+export { getAlertSettings, setAlertSettings, sendTestAlert } from './callables/alerts.js';

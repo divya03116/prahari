@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { PageHeader } from '@/components/ui/misc';
 import { DataRow, Panel, PanelBody, PanelFooter, PanelHeader } from '@/components/ui/panel';
+import { AlertSettingsPanel } from '@/components/AlertSettings';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useReference } from '@/hooks/reference';
 import { useI18n } from '@/i18n';
@@ -136,6 +137,8 @@ export default function Settings() {
             <InstallApp />
           </PanelBody>
         </Panel>
+
+        <AlertSettingsPanel />
 
         <Panel>
           <PanelHeader title={t('settings.access')} description={t('settings.accessDescription')} />

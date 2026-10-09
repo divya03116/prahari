@@ -299,3 +299,21 @@ export const statementSchema = z.object({
   source: z.enum(['text', 'voice']),
 });
 export type StatementInput = z.infer<typeof statementSchema>;
+
+/* ------------------------------------------------------------------ *
+ * Tier 1 alerts
+ * ------------------------------------------------------------------ */
+
+/** A person's own alert channels. The WhatsApp number is in international form: +919876543210. */
+export const alertSettingsSchema = z
+  .object({
+    email: z.boolean(),
+    whatsapp: z.boolean(),
+    whatsappNumber: z
+      .string()
+      .trim()
+      .transform((v) => v.replace(/[\s()-]/g, ''))
+      .refine((v) => v === '' || /^\+[1-9]\d{7,14}$/.test(v), 'Enter the number with its country code, e.g. +91 98765 43210'),
+  })
+  .refine((v) => !v.whatsapp || v.whatsappNumber !== '', { path: ['whatsappNumber'], message: 'Enter a WhatsApp number to receive alerts there' });
+export type AlertSettings = z.infer<typeof alertSettingsSchema>;

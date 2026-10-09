@@ -257,6 +257,17 @@ await expectHttp('officer cannot read the audit log', 'DENIED', () => fetch(`${F
 await expectHttp('admin can read the audit log', 'ALLOWED', () => fetch(`${FS_REST}/auditLogs?pageSize=1`, { headers: H(admin.token) }));
 await expectHttp('nobody can read rate-limit counters', 'DENIED', () => fetch(`${FS_REST}/rateLimits?pageSize=1`, { headers: H(admin.token) }));
 
+// Tier 1 alert records: what was sent, for the people who review reports.
+await expectHttp('reviewer cannot read alert records', 'DENIED', () => fetch(`${FS_REST}/alerts?pageSize=1`, { headers: H(reviewer.token) }));
+await expectHttp('manager cannot read alert records', 'DENIED', () => fetch(`${FS_REST}/alerts?pageSize=1`, { headers: H(manager.token) }));
+await expectHttp('officer can read alert records', 'ALLOWED', () => fetch(`${FS_REST}/alerts?pageSize=1`, { headers: H(officer.token) }));
+await expectHttp('nobody can forge an alert record', 'DENIED', () =>
+  fetch(`${FS_REST}/alerts`, { method: 'POST', headers: H(admin.token), body: JSON.stringify({ fields: { status: S('done') } }) }),
+);
+await expectHttp('nobody can set their own alert channels directly', 'DENIED', () =>
+  fetch(`${FS_REST}/users/${officer.uid}?updateMask.fieldPaths=alerts`, { method: 'PATCH', headers: H(officer.token), body: JSON.stringify({ fields: { alerts: { mapValue: { fields: { email: { booleanValue: false } } } } } }) }),
+);
+
 await expectHttp('reviewer cannot promote themselves', 'DENIED', () =>
   fetch(`${FS_REST}/users/${reviewer.uid}?updateMask.fieldPaths=role`, { method: 'PATCH', headers: H(reviewer.token), body: JSON.stringify({ fields: { role: S('admin') } }) }),
 );

@@ -10,6 +10,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { Timestamp } from 'firebase-admin/firestore';
 
+import { alertTier1 } from '../lib/alerts.js';
 import { audit, db, dayKey, FieldValue, guard, internal, parse, rateLimit, storage } from '../lib/core.js';
 import { bumpDaily, openEngineActions, recomputeHeat, shiftDaily } from '../lib/rollups.js';
 import { COLLECTIONS, LIMITS } from '../shared/constants.js';
@@ -215,6 +216,8 @@ export const rescoreReport = onCall(async (request) => {
       to: result.score,
       engineVersion: result.engineVersion,
     });
+    // A report that only now reaches Tier 1 alerts once, like any other.
+    await alertTier1(reportId, r, result, capa[0]?.control ?? null);
     return { ok: true, score: result.score, tier: result.tier };
   } catch (err) {
     internal(err, { fn: 'rescoreReport' });
