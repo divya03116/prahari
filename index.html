@@ -31,6 +31,12 @@
       so without these every Hindi, Assamese and Bengali report would fall back
       to whatever the operating system has, or render as boxes.
     -->
+    <!--
+      The sign-in check and the first data read go to these two hosts; opening the
+      connections while the scripts download saves a round trip on a first visit.
+    -->
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
