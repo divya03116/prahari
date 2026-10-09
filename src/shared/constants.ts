@@ -97,6 +97,7 @@ export const COLLECTIONS = {
   labels: 'labels',
   auditLogs: 'auditLogs',
   rateLimits: 'rateLimits',
+  alerts: 'alerts',
 } as const;
 
 /**

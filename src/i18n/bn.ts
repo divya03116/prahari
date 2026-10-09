@@ -646,4 +646,27 @@ export const bn: Record<MessageKey, string> = {
   'settings.installIos': 'Safari-তে Share চাপুন, তারপর “Add to Home Screen” বেছে নিন।',
   'settings.installOther': 'আপনার ব্রাউজারের মেনু খুলে “Install app” বা “Add to Home screen” বেছে নিন।',
   'settings.installDone': 'PRAHARI ইনস্টল হয়েছে',
+
+  // Tier 1 alerts
+  'alerts.title': 'টিয়ার 1 সতর্কবার্তা',
+  'alerts.description':
+    'কোনো রিপোর্ট টিয়ার 1 · গুরুতর হিসেবে মূল্যায়িত হলে সঙ্গে সঙ্গে জানুন। HSE কর্মকর্তা ও প্রশাসকরা সব ইনস্টলেশনের জন্য, ম্যানেজাররা নিজের ইনস্টলেশনের জন্য সতর্কবার্তা পান।',
+  'alerts.whatsappNumber': 'WhatsApp নম্বর',
+  'alerts.whatsappHint': 'দেশের কোডসহ, যেমন +91 98765 43210।',
+  'alerts.numberInvalid': 'দেশের কোডসহ নম্বর দিন, যেমন +91 98765 43210।',
+  'alerts.numberRequired': 'WhatsApp-এ সতর্কবার্তা পেতে নম্বর দিন।',
+  'alerts.noEmailOnAccount': 'এই অ্যাকাউন্টে ইমেল ঠিকানা নেই।',
+  'alerts.emailNotSetUp': 'সার্ভারে ইমেল সতর্কবার্তা এখনো চালু করা হয়নি, তাই কিছু পাঠানো হবে না।',
+  'alerts.whatsappNotSetUp': 'সার্ভারে WhatsApp সতর্কবার্তা এখনো চালু করা হয়নি, তাই কিছু পাঠানো হবে না।',
+  'alerts.saved': 'সতর্কবার্তার সেটিংস সংরক্ষিত হয়েছে',
+  'alerts.sendTest': 'আমাকে পরীক্ষামূলক সতর্কবার্তা পাঠান',
+  'alerts.testDone': 'পরীক্ষামূলক সতর্কবার্তা',
+  'alerts.row': 'সতর্কবার্তা',
+  'alerts.status.sent': '{sent} জনকে পাঠানো হয়েছে',
+  'alerts.status.partial': '{sent}টি পাঠানো হয়েছে, {failed}টি ব্যর্থ',
+  'alerts.status.failed': 'পাঠানো যায়নি',
+  'alerts.status.notConfigured': 'চালু করা হয়নি',
+  'alerts.status.noRecipients': 'পাঠানোর মতো কেউ নেই',
+  'alerts.status.sending': 'পাঠানো হচ্ছে…',
+  'alerts.status.none': 'এই রিপোর্টের জন্য কোনো সতর্কবার্তা পাঠানো হয়নি।',
 };

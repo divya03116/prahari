@@ -82,6 +82,8 @@ export interface UserDoc {
   disabled: boolean;
   createdAt: TimestampLike;
   lastSeenAt: TimestampLike;
+  /** Tier 1 alert channels; written only by setAlertSettings. */
+  alerts?: { email: boolean; whatsapp: boolean; whatsappNumber: string };
 }
 
 /* installations/{id}, activities/{id} */
@@ -198,6 +200,28 @@ export interface AuditDoc {
   target: string | null;
   detail: Record<string, unknown>;
   at: TimestampLike;
+}
+
+/* alerts/{reportId} — what was sent when a report scored Tier 1 */
+export type AlertChannelStatus = 'sent' | 'partial' | 'failed' | 'not-configured' | 'no-recipients';
+export interface AlertChannelResult {
+  status: AlertChannelStatus;
+  sent: number;
+  failed: number;
+  error?: string;
+}
+export interface AlertDoc {
+  reportId: string;
+  installationId: string;
+  installationName: string;
+  tier: 1;
+  score: number;
+  status: 'sending' | 'done' | 'failed';
+  email?: AlertChannelResult;
+  whatsapp?: AlertChannelResult;
+  error?: string;
+  createdAt: TimestampLike;
+  finishedAt?: TimestampLike;
 }
 
 export type WithId<T> = T & { id: string };

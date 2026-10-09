@@ -161,6 +161,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // What was sent when a report scored Tier 1 (counts and provider status,
+    // never addresses). Written only by the server.
+    match /alerts/{reportId} {
+      allow read: if atLeast('hse-officer');
+      allow write: if false;
+    }
+
     // Server bookkeeping; never visible to a client.
     match /rateLimits/{id} {
       allow read, write: if false;

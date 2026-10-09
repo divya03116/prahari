@@ -117,8 +117,11 @@ src/
     assessment.tsx, charts.tsx, Attachments.tsx, ActionDialogs.tsx, …
   hooks/         useAsync, useLive (onSnapshot), usePager (cursor pagination),
                  ReferenceProvider (installations/activities, one listener each)
+  i18n/          interface languages: en.ts (source of truth), hi.ts, as.ts, bn.ts
   layouts/       AppShell (sidebar + mobile drawer), AuthLayout
   lib/           firebase init, error translation, formatting, safe redirects
+  offline/       the outbox for reports filed without a connection, status bar
+  pwa/           service worker, its registration, the Install button
   pages/         Landing, auth/*, app/*, admin/*, NotFound
   ai/            camera access, speech-to-text, inference-service client
   services/      the only code that talks to Firebase (reads, callables, storage)
@@ -141,13 +144,64 @@ src/
 | `/app/monitoring` | verified | Live safety monitoring: missing PPE, unsafe acts, unsafe conditions and near misses; zones, model status, automatic incidents |
 | `/app/actions` | verified | Corrective actions: status views, installation filter, update |
 | `/app/insights` | verified | Heat by installation × day, recurring hazard signatures, verdict mix |
-| `/app/settings` | verified | Profile name, role, password reset, sign out |
+| `/app/settings` | verified | Profile name, language, install the app, Tier 1 alert channels, role, password reset, sign out |
 | `/app/admin/users` | admin | Search, change role, assign installation, disable/enable, delete |
 | `/app/admin/reference` | admin | Installations and activities CRUD |
 | `/app/admin/audit` | admin | Append-only audit log with event filter |
 
 Routes from earlier versions (`/login`, `/triage`, `/submit`, `/heat`, `/actions`,
 `/admin`, `/report/:id`) redirect to their new homes.
+
+### Languages
+
+The interface is available in **English, Hindi, Assamese and Bengali**; the
+switcher is on the sign-in screen, in the menu and in Settings, and the choice is
+remembered on the device. `src/i18n/en.ts` is the source of truth: the other three
+dictionaries are typed against it, so a missing string is a compile error, and each
+is downloaded only when chosen. Dates use the language's month names with 0–9
+digits.
+
+What a person wrote is **never translated** — narratives, statements and notes are
+shown exactly as written, in whatever language they were written. Still English
+only: text produced by the scoring engine and the server (hazard names, rule
+titles, drafted actions, validation messages), and the Insights, Live monitoring,
+administration and public landing pages. The Hindi, Assamese and Bengali wording
+was written without a native-speaking safety practitioner and needs that review
+before operational use.
+
+### PDF export
+
+**Export PDF** on a report opens the browser's print dialog with a document made
+for paper (`components/ReportPrint.tsx`): a light A4 layout with the key facts,
+score and tier, the narrative as written, structured incident, findings, rule
+breaches, score build-up, evidence, officer review, corrective actions, statements
+and attachments. Choosing *Save as PDF* gives a file named after the report. The
+document exists only while printing, uses the browser's own text shaping (so
+Indic scripts print correctly), follows the interface language, and — like the
+screen — never shows who filed the report.
+
+### Installable app and offline use
+
+PRAHARI is a Progressive Web App. **Settings → App → Install app** (or the
+browser's own *Install* / *Add to Home Screen*) puts it on a phone or laptop.
+
+- **Opens offline.** A service worker (`src/pwa/sw.js`, emitted as `/sw.js` by a
+  small plugin in `vite.config.ts` with the list of built files) keeps the
+  application on the device. It caches the app only, never data; every build has
+  its own cache, and a new version is offered with a *Reload* prompt. Development
+  has no service worker.
+- **Reports are not lost.** A report filed with no connection — or when the server
+  cannot be reached — is kept in an on-device outbox (IndexedDB, with its photos)
+  and sent automatically, oldest first, when the connection returns, the app
+  comes back to the front, or once a minute while something waits. Sending is safe
+  to repeat: the server refuses a second report with the same id, which counts as
+  delivered. A bar at the top shows what is waiting and anything the server
+  refused.
+- **Limits.** Sending happens while the app is open (there is no background sync
+  with the app closed). Offline you can file reports and read what the device has
+  already loaded; verdicts, actions and administration need a connection. The AI
+  photo check needs the inference service, so offline a photo is attached but not
+  analysed.
 
 **Performance:** every route is lazy-loaded; the Functions and Storage SDKs are
 loaded on first write/upload only; Firestore uses a persistent multi-tab cache;
@@ -163,7 +217,7 @@ screen downloads the whole register.
 | Function | Min. role | What it does |
 |---|---|---|
 | `submitReport` | reviewer | Validates, checks the installation/activity are active, **verifies every attachment in Storage** (own folder, exists, real size and type), writes the report as `pending`. Rate-limited to 30/hour per user. |
-| `scoreReport` (trigger) | — | Scores, drafts CAPA, opens Tier 1/2 actions, updates `stats` and `heat`. Marks the report `failed` rather than leaving it stuck. |
+| `scoreReport` (trigger) | — | Scores, drafts CAPA, opens Tier 1/2 actions, updates `stats` and `heat`, and sends the Tier 1 alert. Marks the report `failed` rather than leaving it stuck. |
 | `recordVerdict` | hse-officer | Confirm / escalate / downgrade / dismiss; writes a training label; transactional. |
 | `rescoreReport` | admin | Re-runs the current engine; keeps stats and heat consistent (including reports that previously failed). |
 | `archiveReport` | admin | Soft delete with a reason; cancels open actions; removes it from totals and heat. |
@@ -175,6 +229,50 @@ screen downloads the whole register.
 | `createPpeIncident` | reviewer | Files a camera incident for a confirmed PPE violation: verifies the evidence frame in Storage, then **deduplicates in a transaction** on `ppeCooldowns/{camera}__{ppe type}` — within the cooldown it returns the existing incident instead of creating another. Rate-limited to 120/hour. |
 | `addStatement` | reviewer | Adds a worker's voice or text statement to an existing incident (combined incident), up to 20. |
 | `cleanupOrphanAttachments` (daily) | — | Deletes uploads older than 24 h whose report was never filed. |
+| `getAlertSettings` / `setAlertSettings` | reviewer / installation-manager | A person's own Tier 1 alert channels (email, WhatsApp number), and whether the server is set up to send on each. |
+| `sendTestAlert` | admin | Sends a clearly marked test alert to the caller and returns exactly what each provider answered. |
+
+### Tier 1 alerts
+
+When a report is scored **Tier 1 · Critical**, `lib/alerts.ts` tells the people who
+must act — every HSE officer and administrator, and the managers of that
+installation — by **email** and **WhatsApp**. Each person chooses their channels
+under *Settings → Tier 1 alerts* (email is on by default; WhatsApp needs a
+number). The message gives the site, score, response window, the narrative as
+written, why it scored Tier 1, the first action and a link. It never says who
+filed the report.
+
+Both channels are **off until configured** in `functions/.env.<project-id>`
+(git-ignored), then redeploy the functions:
+
+| Variable | Meaning |
+|---|---|
+| `ALERT_APP_URL` | Address of the web app, for the link in the message |
+| `ALERT_EMAIL_PROVIDER` | `resend` or `brevo` (their HTTPS APIs; no extra package) |
+| `ALERT_EMAIL_API_KEY` | That provider's API key |
+| `ALERT_EMAIL_FROM` | Sender, on a domain verified with the provider: `PRAHARI Alerts <alerts@your-domain>` |
+| `WHATSAPP_TOKEN` | WhatsApp Cloud API access token (Meta Business) |
+| `WHATSAPP_PHONE_NUMBER_ID` | The sending number's id |
+| `WHATSAPP_TEMPLATE`, `WHATSAPP_TEMPLATE_LANG` | Approved template and its language (default `prahari_tier1_alert`, `en`) |
+
+WhatsApp only lets a business start a conversation with an approved template.
+Create a *Utility* template with four body variables, in this order:
+
+```
+PRAHARI Tier 1 alert
+Site: {{1}}
+SIF potential: {{2}}/100
+{{3}}
+Open: {{4}}
+```
+
+Nothing is reported as sent that was not. Every alert leaves a record in
+`alerts/{reportId}` with, per channel, how many messages the provider accepted,
+how many it refused, or that the channel is not set up; officers see it on the
+report. There is one alert per report, however often it is re-scored. Until a
+provider is configured, Settings says so and the record reads *not set up*.
+These values are plain function configuration; move the two keys to Secret
+Manager if your policy requires it.
 
 Shared helpers (`functions/src/lib/core.ts`): `guard()` (auth, verified email, role
 claim, disabled check), `parse()` (zod → readable `invalid-argument`), `audit()`,
@@ -198,7 +296,7 @@ claim, disabled check), `parse()` (zod → readable `invalid-argument`), `audit(
 
 | Collection | Key fields | Written by |
 |---|---|---|
-| `users/{uid}` | `email, displayName, role, installationId, disabled, createdAt, lastSeenAt` | the user (create at lowest role; rename only) and admin callables |
+| `users/{uid}` | `email, displayName, role, installationId, disabled, createdAt, lastSeenAt, alerts{email, whatsapp, whatsappNumber}` | the user (create at lowest role; rename only), admin callables, `setAlertSettings` |
 | `reports/{id}` | `text, installationId/Name, activityId/Name, shift, type, contractor, attachments[], source (text/voice/camera), geo, status (pending/scored/failed), reportedBy (uid only), archived, verdictDecision, createdAt` + assessment: `score, tier, energy[], barrier[], exposure[], evidence[], contributions[], rulesTriggered[], capa[], structured{…}, searchTokens[], verdict{…}` + camera incidents: `camera{…}, ppe{violations, workers, model, settings, evidence}` + `statements[]` | `submitReport`, `createPpeIncident`, `addStatement`, `scoreReport`, `recordVerdict`, `rescoreReport`, `archiveReport` |
 | `actions/{id}` | `reportId, reportedBy (the report's author, for visibility), installationId/Name, tier, order, control, rationale, owner, dueAt, status, source (engine/manual), note, closedAt/By` | trigger + action callables |
 | `installations/{id}`, `activities/{id}` | `name, code, region, active, createdAt, updatedAt` | reference callables |
@@ -206,6 +304,7 @@ claim, disabled check), `parse()` (zod → readable `invalid-argument`), `audit(
 | `heat/{installationId__day}` | `installationId, installationName, day, peak, count` | trigger / recompute |
 | `labels/{id}` | narrative + prediction + human verdict (supervised training set) | `recordVerdict` |
 | `auditLogs/{id}` | `action, actorUid, actorName, target, detail, at` | every callable |
+| `alerts/{reportId}` | `installationId/Name, tier, score, status, email{status, sent, failed}, whatsapp{…}` — what was sent for a Tier 1 report; no addresses | `scoreReport`, `rescoreReport` (readable by officers) |
 | `rateLimits/{uid__bucket}` | fixed-window counters | callables (never readable) |
 | `ppeCooldowns/{cameraId__ppeType}` | `reportId, until` — incident cooldown per camera and PPE type | `createPpeIncident` (never readable) |
 
@@ -297,6 +396,8 @@ For the Vercel build (`npm run build:vercel`) the same variables go in `.env.ver
 Functions: `BOOTSTRAP_ADMIN_EMAIL` in `functions/.env.<project-id>` is the one
 address allowed to claim the first administrator role (see [§11](#11-deployment));
 the emulator's `functions/.env.local` leaves it empty, so nobody can claim there.
+The Tier 1 alert settings (`ALERT_*`, `WHATSAPP_*`) go in the same file; see
+[Tier 1 alerts](#tier-1-alerts).
 
 The inference service's own variables are listed in [§12](#12-ai-safety-features).
 
@@ -595,10 +696,11 @@ time the app, not that cold start.
 | `npm run test:engine` | 14 fixtures land on the expected tier (incl. Hindi and Assamese) |
 | `npm run test:ppe` | 22 checks of the PPE rule engine: YOLO decoding, letterbox, NMS, PPE-to-worker association, tracking, multi-frame/duration confirmation, cooldown, and incident structuring (“Not specified”, no invented details) |
 | `npm run test:rules` | 112 adversarial checks with real tokens: Firestore rules, Storage rules, who may read which report/action/attachment (own, installation, whole register, list queries), phone and Apple accounts (verified, own-only, no email in a phone profile), the one-time first-admin claim, callable authorisation and scoping, camera PPE and hazard incidents (types, zones, forged keys, deduplication), photo reports and statements |
+| `npm run test:alerts` | 41 checks of Tier 1 alerts with the email and WhatsApp providers replaced by a local stand-in server: message content (narrative as written, escaped, reporter never identified), who is told, number validation, Resend and Brevo request shapes, the WhatsApp template call, and honest results for *not configured*, partial failure and total failure |
 | `npm run test:cleanup` | The orphan-attachment sweep deletes only what it should |
 | `npm run test:e2e` | 49 Playwright tests (4 of them opt-in, with the real models): auth flows (sign-up → verify → sign-in, reset, bad links, open redirect; Google/Apple/phone offered; phone sign-in with an SMS code from the Auth emulator, wrong code refused), full report lifecycle with upload, register search/filters/pagination, verdicts and actions, admin users/reference/audit, role guards, report visibility (a reviewer sees only their own; a manager only their installation's), dashboard, voice/text reporting with GPS and structuring, speech fallback, camera start/stop with a real (fake-device) stream (and starting by itself once a refused camera permission is allowed) and honest *AI Model Not Configured* status, combined camera + statement incidents, and layout at 375 / 768 / 1280 / 1440 / 1920 px with no horizontal page scroll; any console error fails a test |
 | `PREVIEW=1 npm run test:e2e` | The same suite against the production build with the CSP enforced |
-| `npm test` | engine + PPE + hazards + rules + cleanup + E2E |
+| `npm test` | engine + PPE + hazards + alerts + rules + cleanup + E2E |
 | `PPE_FAKE_CAMERA=<file.mjpeg> npx playwright test monitoring-model` | Opt-in, with the inference service running: Chrome's fake camera plays held-out test photos (made by `python ai/ppe/make_test_video.py`); a worker without a helmet must produce exactly **one** automatic incident with its evidence frame, and the repeat must be suppressed by the cooldown |
 | `npm run test:hazards` | 30 checks of the hazard rules: zones, posture, vehicle motion and proximity, obstruction, phone use, fire, confirmation, cooldown, photo analysis, narratives and structuring |
 | `PPE_HAZARD_CAMERA=… PPE_FIRE_PHOTO=… npx playwright test hazards-model` | Opt-in, with the inference service running: the camera files a restricted-zone unsafe act and a fire-or-smoke unsafe condition by itself from held-out test images; a fire-scene photo is checked, filled in and sent automatically; Cancel stops the send (media from `python ai/hazards/make_hazard_media.py`) |

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { useAuth } from '@/auth/AuthProvider';
 import { CreateActionDialog, EditActionDialog } from '@/components/ActionDialogs';
+import { AlertStatus } from '@/components/AlertSettings';
 import { AttachmentList } from '@/components/Attachments';
 import { ReportPrint } from '@/components/ReportPrint';
 import {
@@ -514,6 +515,11 @@ export default function ReportDetail() {
                 <DataRow label={t('reports.contractor')}>{r.contractor ? t('common.yes') : t('common.no')}</DataRow>
                 {r.scoredAt && <DataRow label={t('detail.scored')}>{formatDateTime(r.scoredAt)}</DataRow>}
                 {r.engineVersion && <DataRow label={t('detail.engine')}>v{r.engineVersion}</DataRow>}
+                {r.tier === 1 && can('hse-officer') && (
+                  <DataRow label={t('alerts.row')}>
+                    <AlertStatus reportId={r.id} />
+                  </DataRow>
+                )}
                 <DataRow label={t('detail.reportId')}>
                   <span className="font-mono text-xs break-all">{r.id}</span>
                 </DataRow>

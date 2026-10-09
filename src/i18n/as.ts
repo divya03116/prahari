@@ -648,4 +648,27 @@ export const as: Record<MessageKey, string> = {
   'settings.installIos': 'Safari-ত Share টিপক, তাৰ পাছত “Add to Home Screen” বাছক।',
   'settings.installOther': 'আপোনাৰ ব্ৰাউজাৰৰ মেনু খুলি “Install app” বা “Add to Home screen” বাছক।',
   'settings.installDone': 'PRAHARI ইনষ্টল হ’ল',
+
+  // Tier 1 alerts
+  'alerts.title': 'টিয়াৰ 1 সতৰ্কবাৰ্তা',
+  'alerts.description':
+    'কোনো প্ৰতিবেদন টিয়াৰ 1 · গুৰুতৰ হিচাপে মূল্যায়িত হ’লে লগে লগে জাননী পাওক। HSE বিষয়া আৰু প্ৰশাসকসকলে প্ৰতিটো ইনষ্টলেশ্যনৰ বাবে, প্ৰবন্ধকসকলে নিজৰ ইনষ্টলেশ্যনৰ বাবে সতৰ্কবাৰ্তা পায়।',
+  'alerts.whatsappNumber': 'WhatsApp নম্বৰ',
+  'alerts.whatsappHint': 'দেশৰ ক’ডৰ সৈতে, যেনে +91 98765 43210।',
+  'alerts.numberInvalid': 'নম্বৰটো দেশৰ ক’ডৰ সৈতে দিয়ক, যেনে +91 98765 43210।',
+  'alerts.numberRequired': 'WhatsApp-ত সতৰ্কবাৰ্তা পাবলৈ নম্বৰ দিয়ক।',
+  'alerts.noEmailOnAccount': 'এই একাউণ্টত ইমেইল ঠিকনা নাই।',
+  'alerts.emailNotSetUp': 'ছাৰ্ভাৰত ইমেইল সতৰ্কবাৰ্তা এতিয়াও ছেট কৰা হোৱা নাই, সেয়ে একো পঠোৱা নহ’ব।',
+  'alerts.whatsappNotSetUp': 'ছাৰ্ভাৰত WhatsApp সতৰ্কবাৰ্তা এতিয়াও ছেট কৰা হোৱা নাই, সেয়ে একো পঠোৱা নহ’ব।',
+  'alerts.saved': 'সতৰ্কবাৰ্তাৰ ছেটিংছ সংৰক্ষিত হ’ল',
+  'alerts.sendTest': 'মোক পৰীক্ষামূলক সতৰ্কবাৰ্তা পঠাওক',
+  'alerts.testDone': 'পৰীক্ষামূলক সতৰ্কবাৰ্তা',
+  'alerts.row': 'সতৰ্কবাৰ্তা',
+  'alerts.status.sent': '{sent} জনক পঠোৱা হ’ল',
+  'alerts.status.partial': '{sent}টা পঠোৱা হ’ল, {failed}টা বিফল',
+  'alerts.status.failed': 'পঠাব পৰা নগ’ল',
+  'alerts.status.notConfigured': 'ছেট কৰা হোৱা নাই',
+  'alerts.status.noRecipients': 'পঠাবলৈ কোনো নাই',
+  'alerts.status.sending': 'পঠোৱা হৈছে…',
+  'alerts.status.none': 'এই প্ৰতিবেদনৰ বাবে কোনো সতৰ্কবাৰ্তা পঠোৱা হোৱা নাই।',
 };

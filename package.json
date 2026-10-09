@@ -21,11 +21,12 @@
     "test:engine": "npm run functions:build && node scripts/engine-test.mjs",
     "test:rules": "node scripts/rules-test.mjs",
     "test:e2e": "playwright test",
-    "test": "npm run test:engine && npm run test:ppe && npm run test:hazards && npm run test:rules && npm run test:cleanup && npm run test:e2e",
+    "test": "npm run test:engine && npm run test:ppe && npm run test:hazards && npm run test:alerts && npm run test:rules && npm run test:cleanup && npm run test:e2e",
     "indexes": "node scripts/gen-indexes.mjs",
     "test:cleanup": "node scripts/cleanup-test.mjs",
     "test:ppe": "npm run functions:build && node scripts/ppe-test.mjs",
-    "test:hazards": "npm run functions:build && node scripts/hazard-test.mjs"
+    "test:hazards": "npm run functions:build && node scripts/hazard-test.mjs",
+    "test:alerts": "npm run functions:build && node scripts/alerts-test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
