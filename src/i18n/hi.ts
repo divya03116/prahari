@@ -977,4 +977,10 @@ export const hi: Record<MessageKey, string> = {
   'account.disabled': 'आपका खाता प्रशासक ने बंद कर दिया है।',
   'account.roleNow': 'अब आपकी भूमिका {role} है।',
   'account.roleChanged': 'आपकी पहुँच का स्तर बदल गया है। आगे बढ़ने के लिए फिर साइन इन करें।',
+
+  // phone tab bar
+  'nav.quick': 'त्वरित मेनू',
+  'nav.tab.home': 'होम',
+  'nav.tab.report': 'रिपोर्ट करें',
+  'nav.tab.actions': 'कार्रवाइयाँ',
 };

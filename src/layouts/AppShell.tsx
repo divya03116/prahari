@@ -49,6 +49,15 @@ const WORKSPACE: NavEntry[] = [
   { to: '/app/insights', label: 'nav.insights', icon: <LineChart /> },
 ];
 
+/** The phone tab bar: the places people go most, within reach of a thumb. */
+const TABS: (NavEntry & { primary?: boolean })[] = [
+  { to: '/app', label: 'nav.tab.home', icon: <LayoutGrid />, end: true },
+  { to: '/app/reports', label: 'nav.reports', icon: <FileText /> },
+  { to: '/app/report', label: 'nav.tab.report', icon: <Mic />, primary: true },
+  { to: '/app/actions', label: 'nav.tab.actions', icon: <ClipboardCheck /> },
+  { to: '/app/settings', label: 'nav.settings', icon: <Settings /> },
+];
+
 const ADMIN: NavEntry[] = [
   { to: '/app/admin/users', label: 'nav.users', icon: <Users /> },
   { to: '/app/admin/reference', label: 'nav.reference', icon: <Building2 /> },
@@ -78,6 +87,29 @@ function NavItem({ entry, onNavigate }: { entry: NavEntry; onNavigate?: () => vo
           <span className="truncate">{t(entry.label)}</span>
         </>
       )}
+    </NavLink>
+  );
+}
+
+function TabItem({ entry }: { entry: (typeof TABS)[number] }) {
+  const { t } = useI18n();
+  return (
+    <NavLink
+      to={entry.to}
+      end={entry.end}
+      className={({ isActive }) =>
+        cn(
+          'flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-2xs font-medium transition-colors [&_svg]:size-5 [&_svg]:shrink-0',
+          isActive ? 'text-fg' : 'text-fg-subtle hover:text-fg-muted',
+        )
+      }
+    >
+      {entry.primary ? (
+        <span className="flex h-7 w-11 items-center justify-center rounded-full bg-signal text-fg-inverse [&_svg]:size-4">{entry.icon}</span>
+      ) : (
+        entry.icon
+      )}
+      <span className="max-w-full truncate">{t(entry.label)}</span>
     </NavLink>
   );
 }
@@ -227,10 +259,19 @@ export function AppShell() {
         </Link>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8 print:max-w-none print:p-0">
+      <main id="main" className="mx-auto w-full max-w-[1400px] px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:py-8 lg:pb-8 print:max-w-none print:p-0">
         <OfflineBar />
         <Outlet />
       </main>
+
+      <nav
+        aria-label={t('nav.quick')}
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden print:hidden"
+      >
+        {TABS.map((e) => (
+          <TabItem key={e.to} entry={e} />
+        ))}
+      </nav>
     </div>
   );
 }

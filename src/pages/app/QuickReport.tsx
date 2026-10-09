@@ -302,7 +302,8 @@ function QuickReportForm({ onQueued }: { onQueued: () => void }) {
             aria-checked={mode === value}
             onClick={() => setMode(value)}
             className={cn(
-              'flex h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition-colors',
+              // On a phone the icon sits above the label, so three choices fit side by side in any language.
+              'flex h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border px-1 text-center text-xs leading-4 font-semibold transition-colors sm:h-14 sm:flex-row sm:gap-2 sm:text-sm',
               mode === value ? 'border-signal bg-signal-soft text-fg' : 'border-border-strong bg-surface text-fg-muted hover:text-fg',
             )}
           >
@@ -382,7 +383,7 @@ function QuickReportForm({ onQueued }: { onQueued: () => void }) {
 
       <Field
         label={mode === 'voice' ? t('quick.whatYouSaid') : t('quick.whatHappened')}
-        aside={<span className="text-xs text-fg-subtle tabular">{text.length} / {LIMITS.reportTextMax}</span>}
+        aside={<span className="shrink-0 text-xs whitespace-nowrap text-fg-subtle tabular">{text.length} / {LIMITS.reportTextMax}</span>}
       >
         <Textarea
           rows={5}
@@ -474,7 +475,7 @@ function QuickReportForm({ onQueued }: { onQueued: () => void }) {
 
       {structured && !attachTo && <StructuredIncidentPanel structured={structured} preview />}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-canvas/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm lg:static lg:border-0 lg:bg-transparent lg:p-0">
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 border-t border-border bg-canvas/95 p-3 backdrop-blur-sm lg:static lg:border-0 lg:bg-transparent lg:p-0">
         <div className="mx-auto max-w-xl">
           <Button variant="primary" size="lg" className="h-12 w-full" loading={busy} disabled={!canSubmit} onClick={() => void submit()}>
             {!busy && <Send aria-hidden />} {attachTo ? t('quick.addToIncident') : t('quick.submit')}

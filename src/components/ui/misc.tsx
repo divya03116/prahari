@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Toaster as Sonner } from 'sonner';
 
 import { cn } from '@/lib/cn';
@@ -85,10 +85,20 @@ export function PageHeader({
 }
 
 export function Toaster() {
+  // Below the desktop width the app has a tab bar along the bottom; toasts sit above it.
+  const [wide, setWide] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const onChange = (e: MediaQueryListEvent) => setWide(e.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
   return (
     <Sonner
       theme="dark"
       position="bottom-right"
+      offset={wide ? undefined : { bottom: '4.75rem' }}
+      mobileOffset={{ bottom: '4.75rem' }}
       closeButton
       toastOptions={{
         classNames: {

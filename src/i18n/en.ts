@@ -982,6 +982,12 @@ export const en = {
   'account.disabled': 'Your account has been disabled by an administrator.',
   'account.roleNow': 'Your role is now {role}.',
   'account.roleChanged': 'Your access level changed. Sign in again to continue.',
+
+  // ------------------------------------------------------------------ phone tab bar
+  'nav.quick': 'Quick navigation',
+  'nav.tab.home': 'Home',
+  'nav.tab.report': 'Report',
+  'nav.tab.actions': 'Actions',
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof en;

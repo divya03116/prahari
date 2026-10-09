@@ -977,4 +977,10 @@ export const as: Record<MessageKey, string> = {
   'account.disabled': 'আপোনাৰ একাউণ্ট প্ৰশাসকে নিষ্ক্ৰিয় কৰিছে।',
   'account.roleNow': 'এতিয়া আপোনাৰ ভূমিকা {role}।',
   'account.roleChanged': 'আপোনাৰ প্ৰৱেশাধিকাৰৰ স্তৰ সলনি হ’ল। আগবাঢ়িবলৈ আকৌ ছাইন ইন কৰক।',
+
+  // phone tab bar
+  'nav.quick': 'দ্ৰুত মেনু',
+  'nav.tab.home': 'হ’ম',
+  'nav.tab.report': 'দাখিল কৰক',
+  'nav.tab.actions': 'ব্যৱস্থা',
 };

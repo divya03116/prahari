@@ -82,9 +82,23 @@ for (const vp of VIEWPORTS) {
       await drawer.getByRole('link', { name: 'Insights' }).click();
       await expect(page).toHaveURL(/\/app\/insights/);
       await expect(drawer).toBeHidden();
+
+      // Phone and tablet also get a tab bar along the bottom, within reach of a thumb.
+      const tabs = page.getByRole('navigation', { name: 'Quick navigation' });
+      await expect(tabs.getByRole('link')).toHaveCount(5);
+      await tabs.getByRole('link', { name: 'Report', exact: true }).click();
+      await expect(page).toHaveURL(/\/app\/report$/);
+      // The Submit button stays reachable above the bar, not underneath it.
+      const submit = await page.getByRole('button', { name: 'Submit report' }).boundingBox();
+      const bar = await tabs.boundingBox();
+      expect(submit!.y + submit!.height).toBeLessThanOrEqual(bar!.y);
+      await noHorizontalScroll(page, 'report a hazard');
+      await tabs.getByRole('link', { name: 'Home' }).click();
+      await expect(page).toHaveURL(/\/app$/);
     } else {
       await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Insights' }).click();
       await expect(page).toHaveURL(/\/app\/insights/);
+      await expect(page.getByRole('navigation', { name: 'Quick navigation' })).toBeHidden();
     }
   });
 }
