@@ -5,7 +5,7 @@ import { AlertTriangle, Camera, CameraOff, CheckCircle2, Cpu, PenLine, Play, Ref
 
 import { useAuth } from '@/auth/AuthProvider';
 import { cameraSupport, describeCameraError, listCameras, openCamera, stopStream } from '@/ai/camera';
-import { detectFrame, getModelStatus, INFERENCE_URL, MODEL_ROLE_LABEL, modelFor, type ModelInfo, type ModelRole, type ModelStatus } from '@/ai/inference';
+import { detectFrame, getModelStatus, INFERENCE_URL, modelFor, type ModelInfo, type ModelRole, type ModelStatus } from '@/ai/inference';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, Skeleton } from '@/components/ui/feedback';
@@ -13,12 +13,14 @@ import { Checkbox, Field, Input, Select } from '@/components/ui/field';
 import { PageHeader } from '@/components/ui/misc';
 import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
 import { useReference } from '@/hooks/reference';
+import { rich, translate, useI18n, type MessageKey } from '@/i18n';
+import { ppeKey, reportTypeKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { firebase } from '@/lib/firebase';
 import { api } from '@/services/callables';
 import { startUpload } from '@/services/storage';
-import { COLLECTIONS, REPORT_TYPE_LABEL } from '@/shared/constants';
+import { COLLECTIONS } from '@/shared/constants';
 import {
   DEFAULT_HAZARD_SETTINGS,
   HAZARD_TYPES,
@@ -34,7 +36,6 @@ import {
 import {
   ComplianceMonitor,
   DEFAULT_PPE_SETTINGS,
-  PPE_LABEL,
   PPE_SETTINGS_LIMITS,
   PPE_TYPES,
   supportedPpe,
@@ -81,7 +82,8 @@ function rolesFor(info: ModelInfo | null, ppe: boolean, hazards: HazardType[]): 
   return [...roles].filter(has);
 }
 
-const ZONE_KIND_LABEL: Record<ZoneKind, string> = { danger: 'Restricted (no entry)', 'keep-clear': 'Keep clear (walkway / exit)' };
+const ZONE_KIND_KEY: Record<ZoneKind, MessageKey> = { danger: 'mon.zone.danger', 'keep-clear': 'mon.zone.keep-clear' };
+const ROLE_KEY: Record<ModelRole, MessageKey> = { ppe: 'ai.role.ppe', general: 'ai.role.general', pose: 'ai.role.pose', fire: 'ai.role.fire' };
 
 const CONFIG_KEY = 'prahari.monitoring.v1';
 
@@ -152,6 +154,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function Monitoring() {
   const { user, profile } = useAuth();
+  // `tr`, not `t`: this file already uses `t` for a PPE type in several places.
+  const { t: tr } = useI18n();
   const { installations } = useReference();
   const [cfg, setCfg] = useState<StationConfig>(loadConfig);
   // Latest values for callbacks that outlive a render (detection loop, timers, device events).
@@ -393,13 +397,13 @@ export default function Monitoring() {
           required,
           geo: null,
         });
-        const what = events.map((e) => PPE_LABEL[e.type]).join(', ');
+        const what = events.map((e) => translate(ppeKey(e.type))).join(', ');
         const entry: LogEntry = result.deduplicated
-          ? { at: new Date(), kind: 'suppressed', text: `${what} — already reported within the cooldown`, reportId: result.reportId }
-          : { at: new Date(), kind: 'created', text: `Incident created: missing ${what}`, reportId: result.reportId };
+          ? { at: new Date(), kind: 'suppressed', text: translate('mon.log.suppressed', { what }), reportId: result.reportId }
+          : { at: new Date(), kind: 'created', text: translate('mon.log.createdPpe', { what }), reportId: result.reportId };
         setLog((l) => [entry, ...l].slice(0, 30));
       } catch (err) {
-        setLog((l) => [{ at: new Date(), kind: 'error' as const, text: `Could not file the incident: ${errorMessage(err)}` }, ...l].slice(0, 30));
+        setLog((l) => [{ at: new Date(), kind: 'error' as const, text: translate('mon.log.failed', { error: errorMessage(err) }) }, ...l].slice(0, 30));
       }
     },
     [user, ppeModel, required],
@@ -441,11 +445,16 @@ export default function Monitoring() {
           geo: null,
         });
         const entry: LogEntry = result.deduplicated
-          ? { at: new Date(), kind: 'suppressed', text: `${label} — already reported within the cooldown`, reportId: result.reportId }
-          : { at: new Date(), kind: 'created', text: `Incident created: ${label} (${REPORT_TYPE_LABEL[e.kind].toLowerCase()})`, reportId: result.reportId };
+          ? { at: new Date(), kind: 'suppressed', text: translate('mon.log.suppressed', { what: label }), reportId: result.reportId }
+          : {
+              at: new Date(),
+              kind: 'created',
+              text: translate('mon.log.createdHazard', { label, kind: translate(reportTypeKey(e.kind)).toLowerCase() }),
+              reportId: result.reportId,
+            };
         setLog((l) => [entry, ...l].slice(0, 30));
       } catch (err) {
-        setLog((l) => [{ at: new Date(), kind: 'error' as const, text: `Could not file “${label}”: ${errorMessage(err)}` }, ...l].slice(0, 30));
+        setLog((l) => [{ at: new Date(), kind: 'error' as const, text: translate('mon.log.failedHazard', { label, error: errorMessage(err) }) }, ...l].slice(0, 30));
       }
     },
     [user, info],
@@ -506,8 +515,8 @@ export default function Monitoring() {
         const name = (err as Error).name;
         setDetectError(
           name === 'SecurityError'
-            ? 'The stream server does not allow cross-origin access (CORS), so its frames cannot be analysed.'
-            : errorMessage(err, (err as Error).message || 'Detection failed.'),
+            ? translate('mon.err.cors')
+            : errorMessage(err, (err as Error).message || translate('mon.err.detect')),
         );
         await sleep(1500);
       }
@@ -582,17 +591,17 @@ export default function Monitoring() {
       installationRef.current?.focus();
       return setCamError(
         installations.some((i) => i.active)
-          ? 'Choose the installation this camera watches.'
-          : 'No active installation exists yet — an administrator can add one under Reference data.',
+          ? tr('mon.err.chooseInstallation')
+          : tr('mon.err.noInstallation'),
       );
     }
     if (ready && !required.length && !activeHazards.length) {
-      return setCamError('Switch on at least one PPE item or hazard rule the loaded models can detect.');
+      return setCamError(tr('mon.err.nothingOn'));
     }
     starting.current = true;
     try {
       if (cfg.source === 'stream') {
-        if (!/^https?:\/\//i.test(cfg.streamUrl)) return setCamError('Enter an http(s) stream URL.');
+        if (!/^https?:\/\//i.test(cfg.streamUrl)) return setCamError(tr('mon.err.streamUrl'));
         if (!cfg.label.trim()) update({ label: autoLabel('stream', null, cfg.streamUrl) });
         if (cfg.streamFormat === 'mjpeg') {
           imgRef.current!.crossOrigin = 'anonymous';
@@ -603,8 +612,8 @@ export default function Monitoring() {
           await videoRef.current!.play();
         }
       } else {
-        if (!support.secure) return setCamError('Camera access needs HTTPS (or localhost). Open the site over HTTPS.');
-        if (!support.mediaDevices) return setCamError('This browser cannot access cameras.');
+        if (!support.secure) return setCamError(tr('mon.err.https'));
+        if (!support.mediaDevices) return setCamError(tr('mon.err.noCameraApi'));
         const choice =
           cfg.source === 'device' && cfg.deviceId
             ? ({ kind: 'device', deviceId: cfg.deviceId } as const)
@@ -619,7 +628,7 @@ export default function Monitoring() {
         stream.getVideoTracks()[0]?.addEventListener('ended', () => {
           if (streamRef.current !== stream) return;
           stop();
-          setCamError('The camera disconnected. Reconnecting automatically…');
+          setCamError(translate('mon.err.disconnected'));
           retryTimer.current = window.setTimeout(() => void startRef.current(true), 5000);
         });
       }
@@ -637,7 +646,7 @@ export default function Monitoring() {
       }
     } catch (err) {
       stop();
-      setCamError(cfg.source === 'stream' ? 'The stream could not be opened. Check the URL and that the server allows this site (CORS).' : describeCameraError(err));
+      setCamError(cfg.source === 'stream' ? tr('mon.err.stream') : describeCameraError(err));
     } finally {
       starting.current = false;
     }
@@ -724,8 +733,8 @@ export default function Monitoring() {
   return (
     <>
       <PageHeader
-        title="Live safety monitoring"
-        description="Watches a camera for missing PPE, unsafe acts, unsafe conditions and near misses, and files an incident with the photo automatically once one is confirmed."
+        title={tr('mon.title')}
+        description={tr('mon.description')}
       />
 
       {/* ---------------- model status ---------------- */}
@@ -738,21 +747,35 @@ export default function Monitoring() {
               <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" aria-hidden />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-fg">
-                  {model.info.models.length === 1 ? 'AI model ready' : `AI models ready · ${model.info.models.length} models`} on{' '}
-                  {model.info.models[0].device.toUpperCase()}
+                  {tr('mon.model.on', {
+                    models: model.info.models.length === 1 ? tr('mon.model.ready') : tr('mon.model.readyMany', { count: model.info.models.length }),
+                    device: model.info.models[0].device.toUpperCase(),
+                  })}
                 </p>
                 <ul className="mt-0.5 flex flex-col gap-0.5 text-xs text-fg-muted">
                   {model.info.models.map((m) => (
                     <li key={m.role}>
-                      <span className="text-fg">{MODEL_ROLE_LABEL[m.role]}</span> · {m.name}
-                      {m.role === 'ppe' || m.role === 'fire' ? ` · detects ${m.classes.join(', ')}` : m.keypoints ? ' · people and body posture' : ' · people, vehicles, phones, objects'}
+                      <span className="text-fg">{tr(ROLE_KEY[m.role])}</span> · {m.name}{' '}
+                      {m.role === 'ppe' || m.role === 'fire'
+                        ? tr('mon.model.detects', { classes: m.classes.join(', ') })
+                        : m.keypoints
+                          ? tr('mon.model.posture')
+                          : tr('mon.model.objects')}
                       {m.metrics?.test &&
-                        ` · test set: precision ${m.metrics.test.precision.toFixed(2)}, recall ${m.metrics.test.recall.toFixed(2)}${m.metrics.test.mAP50 !== undefined ? `, mAP@0.5 ${m.metrics.test.mAP50.toFixed(2)}` : ''}`}
+                        ` ${
+                          m.metrics.test.mAP50 !== undefined
+                            ? tr('mon.model.metricsMap', {
+                                p: m.metrics.test.precision.toFixed(2),
+                                r: m.metrics.test.recall.toFixed(2),
+                                map: m.metrics.test.mAP50.toFixed(2),
+                              })
+                            : tr('mon.model.metrics', { p: m.metrics.test.precision.toFixed(2), r: m.metrics.test.recall.toFixed(2) })
+                        }`}
                     </li>
                   ))}
                   {model.info.missing.map((m) => (
                     <li key={m.role} className="text-fg-subtle">
-                      {MODEL_ROLE_LABEL[m.role as ModelRole] ?? m.role} · not loaded: {m.reason}
+                      {m.role in ROLE_KEY ? tr(ROLE_KEY[m.role as ModelRole]) : m.role} {tr('mon.model.notLoaded', { reason: m.reason })}
                     </li>
                   ))}
                 </ul>
@@ -762,13 +785,15 @@ export default function Monitoring() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
               <div>
-                <p className="text-sm font-semibold text-fg">AI Model Not Configured</p>
-                <p className="text-xs text-fg-muted">{model.reason} Cameras can still be previewed; no detection runs and no incidents are created.</p>
+                <p className="text-sm font-semibold text-fg">{tr('mon.notConfigured')}</p>
+                <p className="text-xs text-fg-muted">
+                  {model.reason} {tr('mon.notConfiguredNote')}
+                </p>
               </div>
             </div>
           )}
-          <Button size="sm" onClick={() => void refreshModel()} aria-label="Check the model again">
-            <RefreshCw aria-hidden /> Re-check
+          <Button size="sm" onClick={() => void refreshModel()} aria-label={tr('mon.recheckLabel')}>
+            <RefreshCw aria-hidden /> {tr('mon.recheck')}
           </Button>
         </PanelBody>
       </Panel>
@@ -778,16 +803,16 @@ export default function Monitoring() {
         <div className="flex min-w-0 flex-col gap-5">
           <Panel>
             <PanelHeader
-              title={cfg.label || 'Camera'}
-              description={running ? (detecting ? 'Live · detection on' : ready ? 'Live · detection off (nothing switched on)' : 'Live · detection off (no model)') : 'Stopped'}
+              title={cfg.label || tr('incident.camera.fallback')}
+              description={running ? (detecting ? tr('mon.live.on') : ready ? tr('mon.live.nothing') : tr('mon.live.noModel')) : tr('mon.stopped')}
               actions={
                 running ? (
                   <Button variant="danger" size="sm" onClick={stopByUser}>
-                    <Square aria-hidden /> Stop
+                    <Square aria-hidden /> {tr('mon.stop')}
                   </Button>
                 ) : (
                   <Button variant="primary" size="sm" onClick={() => void start()}>
-                    <Play aria-hidden /> Start camera
+                    <Play aria-hidden /> {tr('mon.start')}
                   </Button>
                 )
               }
@@ -802,55 +827,55 @@ export default function Monitoring() {
                   ref={overlayRef}
                   onClick={addDraftPoint}
                   className={cn('absolute inset-0 size-full', draft ? 'cursor-crosshair' : 'pointer-events-none')}
-                  aria-label={draft ? 'Click to add zone corners' : undefined}
+                  aria-label={draft ? tr('mon.zoneClick') : undefined}
                   aria-hidden={draft ? undefined : true}
                 />
                 {!running && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-fg-subtle">
                     <CameraOff className="size-8" aria-hidden />
-                    <p className="text-sm">Camera off</p>
+                    <p className="text-sm">{tr('mon.cameraOff')}</p>
                   </div>
                 )}
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-fg-muted" role="status" aria-live="polite">
+                <span>{rich(tr('mon.stat.workers'), { n: <b className="text-fg tabular">{workers.length}</b> })}</span>
                 <span>
-                  Workers in view: <b className="text-fg tabular">{workers.length}</b>
+                  {rich(tr('mon.stat.pending'), {
+                    n: <b className="text-warning tabular">{workers.reduce((n, w) => n + Object.keys(w.pending).length, 0)}</b>,
+                  })}
                 </span>
                 <span>
-                  Pending: <b className="text-warning tabular">{workers.reduce((n, w) => n + Object.keys(w.pending).length, 0)}</b>
+                  {rich(tr('mon.stat.confirmed'), {
+                    n: <b className="text-critical tabular">{workers.reduce((n, w) => n + w.confirmed.length, 0)}</b>,
+                  })}
                 </span>
                 <span>
-                  Confirmed: <b className="text-critical tabular">{workers.reduce((n, w) => n + w.confirmed.length, 0)}</b>
+                  {rich(tr('mon.stat.hazards'), {
+                    a: <b className="text-warning tabular">{findings.filter((f) => !f.confirmed).length}</b>,
+                    b: <b className="text-critical tabular">{findings.filter((f) => f.confirmed).length}</b>,
+                  })}
                 </span>
-                <span>
-                  Hazards: <b className="text-warning tabular">{findings.filter((f) => !f.confirmed).length}</b> confirming ·{' '}
-                  <b className="text-critical tabular">{findings.filter((f) => f.confirmed).length}</b> confirmed
-                </span>
-                {running && detecting && (
-                  <span>
-                    {perf.fps.toFixed(1)} fps · {Math.round(perf.ms)} ms/frame
-                  </span>
-                )}
+                {running && detecting && <span>{tr('mon.stat.perf', { fps: perf.fps.toFixed(1), ms: Math.round(perf.ms) })}</span>}
               </div>
             </PanelBody>
           </Panel>
 
           <Panel>
-            <PanelHeader title="Hazards in view" description="Unsafe acts, unsafe conditions and near misses in the current frame" />
+            <PanelHeader title={tr('mon.hazards.title')} description={tr('mon.hazards.desc')} />
             <PanelBody>
               {!findings.length ? (
-                <p className="text-sm text-fg-subtle">{running && detecting ? 'No hazards detected.' : 'Start a camera with a configured model to see hazards.'}</p>
+                <p className="text-sm text-fg-subtle">{running && detecting ? tr('mon.hazards.none') : tr('mon.hazards.start')}</p>
               ) : (
                 <ul className="flex flex-col gap-1.5 text-sm">
                   {findings.map((f) => (
                     <li key={f.key} className="flex items-center justify-between gap-3">
                       <span className="text-fg">
-                        {HAZARDS[f.type].label} <span className="text-xs text-fg-subtle">· {REPORT_TYPE_LABEL[HAZARDS[f.type].kind]}</span>
+                        {HAZARDS[f.type].label} <span className="text-xs text-fg-subtle">· {tr(reportTypeKey(HAZARDS[f.type].kind))}</span>
                       </span>
                       {f.confirmed ? (
-                        <span className="text-xs font-semibold text-critical">Confirmed</span>
+                        <span className="text-xs font-semibold text-critical">{tr('mon.confirmed')}</span>
                       ) : (
-                        <span className="text-xs text-warning">Confirming {Math.round(f.progress * 100)}%</span>
+                        <span className="text-xs text-warning">{tr('mon.confirming', { percent: Math.round(f.progress * 100) })}</span>
                       )}
                     </li>
                   ))}
@@ -860,16 +885,16 @@ export default function Monitoring() {
           </Panel>
 
           <Panel>
-            <PanelHeader title="Workers" description="Per-worker PPE compliance in the current frame" />
+            <PanelHeader title={tr('mon.workers.title')} description={tr('mon.workers.desc')} />
             <PanelBody>
               {!workers.length ? (
-                <p className="text-sm text-fg-subtle">{running && ready ? 'No workers detected.' : 'Start a camera with a configured model to see workers.'}</p>
+                <p className="text-sm text-fg-subtle">{running && ready ? tr('mon.workers.none') : tr('mon.workers.start')}</p>
               ) : (
                 <ul className="grid gap-2 sm:grid-cols-2">
                   {workers.map((w) => (
                     <li key={w.trackId} className="rounded-xl border border-border bg-surface-2 p-3 text-sm">
                       <p className="font-semibold text-fg">
-                        W{w.trackId} <span className="font-normal text-fg-subtle">· person {Math.round(w.person.confidence * 100)}%</span>
+                        W{w.trackId} <span className="font-normal text-fg-subtle">{tr('incident.person', { percent: Math.round(w.person.confidence * 100) })}</span>
                       </p>
                       <ul className="mt-1 flex flex-col gap-0.5 text-xs">
                         {required.map((t) => {
@@ -877,13 +902,13 @@ export default function Monitoring() {
                           const pending = w.pending[t];
                           return (
                             <li key={t} className="flex justify-between gap-2">
-                              <span className="text-fg-muted">{PPE_LABEL[t]}</span>
+                              <span className="text-fg-muted">{tr(ppeKey(t))}</span>
                               {s?.state === 'present' ? (
-                                <span className="text-success">Compliant</span>
+                                <span className="text-success">{tr('mon.compliant')}</span>
                               ) : w.confirmed.includes(t) ? (
-                                <span className="font-semibold text-critical">Violation</span>
+                                <span className="font-semibold text-critical">{tr('incident.violation')}</span>
                               ) : (
-                                <span className="text-warning">Missing · confirming {Math.round((pending ?? 0) * 100)}%</span>
+                                <span className="text-warning">{tr('mon.missingConfirming', { percent: Math.round((pending ?? 0) * 100) })}</span>
                               )}
                             </li>
                           );
@@ -897,10 +922,10 @@ export default function Monitoring() {
           </Panel>
 
           <Panel>
-            <PanelHeader title="Incidents from this session" description="Created automatically; duplicates within the cooldown are suppressed." />
+            <PanelHeader title={tr('mon.session.title')} description={tr('mon.session.desc')} />
             <PanelBody>
               {!log.length ? (
-                <p className="text-sm text-fg-subtle">None yet.</p>
+                <p className="text-sm text-fg-subtle">{tr('mon.session.none')}</p>
               ) : (
                 <ul className="flex flex-col gap-2 text-sm">
                   {log.map((e, i) => (
@@ -911,7 +936,7 @@ export default function Monitoring() {
                         {e.reportId && (
                           <>
                             {' '}
-                            · <Link to={`/app/reports/${e.reportId}`} className="text-fg hover:underline">open</Link>
+                            · <Link to={`/app/reports/${e.reportId}`} className="text-fg hover:underline">{tr('mon.open')}</Link>
                           </>
                         )}
                       </span>
@@ -927,21 +952,21 @@ export default function Monitoring() {
         {/* ---------------- configuration ---------------- */}
         <div className="flex min-w-0 flex-col gap-5">
           <Panel>
-            <PanelHeader title="Camera" />
+            <PanelHeader title={tr('incident.camera.fallback')} />
             <PanelBody className="flex flex-col gap-4">
               <label className="flex items-start gap-2.5 text-sm">
                 <Checkbox className="mt-0.5" checked={cfg.autoStart} onChange={(e) => update({ autoStart: e.target.checked })} />
                 <span>
-                  Start automatically
-                  <span className="block text-xs text-fg-muted">Camera and detection start when this page opens and reconnect by themselves.</span>
+                  {tr('mon.autoStart')}
+                  <span className="block text-xs text-fg-muted">{tr('mon.autoStartHint')}</span>
                 </span>
               </label>
-              <Field label="Camera name" hint={cfg.label ? undefined : 'Filled in automatically from the camera. You can rename it.'}>
-                <Input value={cfg.label} maxLength={80} disabled={running} placeholder="Automatic" onChange={(e) => update({ label: e.target.value })} />
+              <Field label={tr('mon.cameraName')} hint={cfg.label ? undefined : tr('mon.cameraNameHint')}>
+                <Input value={cfg.label} maxLength={80} disabled={running} placeholder={tr('mon.automatic')} onChange={(e) => update({ label: e.target.value })} />
               </Field>
-              <Field label="Installation" error={needInstallation && !cfg.installationId ? 'Required to start the camera.' : undefined}>
+              <Field label={tr('reports.installation')} error={needInstallation && !cfg.installationId ? tr('mon.installationRequired') : undefined}>
                 <Select ref={installationRef} value={cfg.installationId} disabled={running} onChange={(e) => update({ installationId: e.target.value })}>
-                  <option value="">Choose installation</option>
+                  <option value="">{tr('quick.chooseInstallation')}</option>
                   {installations.filter((i) => i.active).map((i) => (
                     <option key={i.id} value={i.id}>
                       {i.name}
@@ -949,21 +974,21 @@ export default function Monitoring() {
                   ))}
                 </Select>
               </Field>
-              <Field label="Source">
+              <Field label={tr('mon.source')}>
                 <Select value={cfg.source} disabled={running} onChange={(e) => update({ source: e.target.value as StationConfig['source'] })}>
-                  <option value="device">This device’s camera (webcam / USB)</option>
-                  <option value="back">Phone — back camera</option>
-                  <option value="front">Phone — front camera</option>
-                  <option value="stream">IP camera (stream URL)</option>
+                  <option value="device">{tr('mon.source.device')}</option>
+                  <option value="back">{tr('mon.source.back')}</option>
+                  <option value="front">{tr('mon.source.front')}</option>
+                  <option value="stream">{tr('mon.source.stream')}</option>
                 </Select>
               </Field>
               {cfg.source === 'device' && (
-                <Field label="Device" hint={devices.some((d) => d.label) ? undefined : 'Names appear after you allow camera access once.'}>
+                <Field label={tr('mon.device')} hint={devices.some((d) => d.label) ? undefined : tr('mon.deviceHint')}>
                   <Select value={cfg.deviceId} disabled={running} onChange={(e) => update({ deviceId: e.target.value })}>
-                    <option value="">Default camera</option>
+                    <option value="">{tr('mon.defaultCamera')}</option>
                     {devices.map((d, i) => (
                       <option key={d.deviceId || i} value={d.deviceId}>
-                        {d.label || `Camera ${i + 1}`}
+                        {d.label || tr('mon.cameraN', { n: i + 1 })}
                       </option>
                     ))}
                   </Select>
@@ -971,25 +996,25 @@ export default function Monitoring() {
               )}
               {streamMode && (
                 <>
-                  <Field label="Stream URL" hint="MJPEG, MP4 or WebM over http(s). RTSP cameras need a gateway such as MediaMTX or go2rtc. The server must allow this site (CORS).">
+                  <Field label={tr('mon.streamUrl')} hint={tr('mon.streamUrlHint')}>
                     <Input value={cfg.streamUrl} disabled={running} placeholder="https://camera-gateway.local/cam1.mjpg" onChange={(e) => update({ streamUrl: e.target.value })} />
                   </Field>
-                  <Field label="Stream format">
+                  <Field label={tr('mon.streamFormat')}>
                     <Select value={cfg.streamFormat} disabled={running} onChange={(e) => update({ streamFormat: e.target.value as 'video' | 'mjpeg' })}>
-                      <option value="mjpeg">MJPEG (image stream)</option>
-                      <option value="video">Video (MP4 / WebM / HLS on Safari)</option>
+                      <option value="mjpeg">{tr('mon.format.mjpeg')}</option>
+                      <option value="video">{tr('mon.format.video')}</option>
                     </Select>
                   </Field>
                 </>
               )}
               <p className="flex items-center gap-1.5 text-2xs text-fg-subtle">
-                <Camera className="size-3" aria-hidden /> Camera ID <span className="font-mono">{cfg.cameraId}</span>
+                <Camera className="size-3" aria-hidden /> {tr('mon.cameraId')} <span className="font-mono">{cfg.cameraId}</span>
               </p>
             </PanelBody>
           </Panel>
 
           <Panel>
-            <PanelHeader title="Required PPE" description="Missing items are judged per worker, never detected as objects." />
+            <PanelHeader title={tr('mon.ppe.title')} description={tr('mon.ppe.desc')} />
             <PanelBody className="flex flex-col gap-2">
               {PPE_TYPES.map((t) => {
                 const can = !ready || supported.includes(t);
@@ -1001,9 +1026,9 @@ export default function Monitoring() {
                         disabled={running || !can}
                         onChange={(e) => update({ required: e.target.checked ? [...cfg.required, t] : cfg.required.filter((x) => x !== t) })}
                       />
-                      {PPE_LABEL[t]}
+                      {tr(ppeKey(t))}
                     </span>
-                    {ready && !can && <Badge>Not in this model</Badge>}
+                    {ready && !can && <Badge>{tr('mon.notInModel')}</Badge>}
                   </label>
                 );
               })}
@@ -1011,7 +1036,7 @@ export default function Monitoring() {
           </Panel>
 
           <Panel>
-            <PanelHeader title="Hazard rules" description="Unsafe acts, unsafe conditions and near misses. Each needs a model that can see it." />
+            <PanelHeader title={tr('mon.rules.title')} description={tr('mon.rules.desc')} />
             <PanelBody className="flex flex-col gap-2">
               {HAZARD_TYPES.map((h) => {
                 const can = !ready || hazardSupport.includes(h);
@@ -1026,13 +1051,13 @@ export default function Monitoring() {
                       />
                       <span>
                         {HAZARDS[h].label}
-                        <span className="block text-2xs text-fg-subtle">{REPORT_TYPE_LABEL[HAZARDS[h].kind]}</span>
+                        <span className="block text-2xs text-fg-subtle">{tr(reportTypeKey(HAZARDS[h].kind))}</span>
                       </span>
                     </span>
                     {ready && !can ? (
-                      <Badge>Not in these models</Badge>
+                      <Badge>{tr('mon.notInModels')}</Badge>
                     ) : needsZone && cfg.hazards.includes(h) ? (
-                      <Badge>Draw a {HAZARDS[h].zone === 'danger' ? 'restricted' : 'keep-clear'} zone</Badge>
+                      <Badge>{HAZARDS[h].zone === 'danger' ? tr('mon.drawRestricted') : tr('mon.drawKeepClear')}</Badge>
                     ) : null}
                   </label>
                 );
@@ -1041,19 +1066,19 @@ export default function Monitoring() {
           </Panel>
 
           <Panel>
-            <PanelHeader title="Zones" description="Areas drawn on this camera's view: nobody may enter a restricted zone; nothing may stand in a keep-clear zone." />
+            <PanelHeader title={tr('mon.zones.title')} description={tr('mon.zones.desc')} />
             <PanelBody className="flex flex-col gap-3">
               {cfg.zones.length > 0 && (
                 <ul className="flex flex-col gap-1.5 text-sm">
                   {cfg.zones.map((z) => (
                     <li key={z.id} className="flex items-center justify-between gap-3">
                       <span className="min-w-0 truncate text-fg">
-                        {z.name} <span className="text-xs text-fg-subtle">· {ZONE_KIND_LABEL[z.kind]}</span>
+                        {z.name} <span className="text-xs text-fg-subtle">· {tr(ZONE_KIND_KEY[z.kind])}</span>
                       </span>
                       <Button
                         size="icon-sm"
                         variant="ghost"
-                        aria-label={`Delete zone ${z.name}`}
+                        aria-label={tr('mon.deleteZone', { name: z.name })}
                         onClick={() => update({ zones: cfg.zones.filter((x) => x.id !== z.id) })}
                       >
                         <Trash2 aria-hidden />
@@ -1065,43 +1090,43 @@ export default function Monitoring() {
               {draft ? (
                 <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface-2 p-3">
                   <p className="text-xs text-fg-muted">
-                    Click on the live view to place the zone's corners ({draft.length} placed; at least 3).
+                    {tr('mon.zoneHelp', { count: draft.length })}
                   </p>
-                  <Field label="Zone name">
-                    <Input value={draftMeta.name} maxLength={60} placeholder="e.g. Crane swing area" onChange={(e) => setDraftMeta({ ...draftMeta, name: e.target.value })} />
+                  <Field label={tr('mon.zoneName')}>
+                    <Input value={draftMeta.name} maxLength={60} placeholder={tr('mon.zoneNamePlaceholder')} onChange={(e) => setDraftMeta({ ...draftMeta, name: e.target.value })} />
                   </Field>
-                  <Field label="Zone type">
+                  <Field label={tr('mon.zoneType')}>
                     <Select value={draftMeta.kind} onChange={(e) => setDraftMeta({ ...draftMeta, kind: e.target.value as ZoneKind })}>
-                      <option value="danger">{ZONE_KIND_LABEL.danger}</option>
-                      <option value="keep-clear">{ZONE_KIND_LABEL['keep-clear']}</option>
+                      <option value="danger">{tr(ZONE_KIND_KEY.danger)}</option>
+                      <option value="keep-clear">{tr(ZONE_KIND_KEY['keep-clear'])}</option>
                     </Select>
                   </Field>
                   <div className="flex gap-2">
                     <Button size="sm" variant="primary" disabled={draft.length < 3 || !draftMeta.name.trim()} onClick={saveZone}>
-                      Save zone
+                      {tr('mon.saveZone')}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>
-                      Cancel
+                      {tr('common.cancel')}
                     </Button>
                   </div>
                 </div>
               ) : (
                 <Button size="sm" disabled={!running} onClick={() => setDraft([])}>
-                  <PenLine aria-hidden /> Draw a zone
+                  <PenLine aria-hidden /> {tr('mon.drawZone')}
                 </Button>
               )}
-              {!running && !draft && <p className="text-xs text-fg-subtle">Start the camera to draw on its view.</p>}
+              {!running && !draft && <p className="text-xs text-fg-subtle">{tr('mon.startToDraw')}</p>}
             </PanelBody>
           </Panel>
 
           <Panel>
-            <PanelHeader title="Detection rules" description="Confidence and multi-frame confirmation reduce false alarms." />
+            <PanelHeader title={tr('mon.detect.title')} description={tr('mon.detect.desc')} />
             <PanelBody className="grid grid-cols-2 gap-4">
-              {setting('minConfidence', 'Min confidence', 0.05, '0.25–0.95')}
-              {setting('confirmationFrames', 'Confirm frames', 1, 'Consecutive frames')}
-              {setting('violationSeconds', 'Violation (s)', 0.5, 'Minimum duration')}
-              {setting('incidentCooldownSeconds', 'Cooldown (s)', 30, 'Per camera and PPE type or hazard')}
-              <Field label="Hazard confidence" hint="0.25–0.95, hazard models">
+              {setting('minConfidence', tr('mon.set.minConfidence'), 0.05, '0.25–0.95')}
+              {setting('confirmationFrames', tr('mon.set.confirmFrames'), 1, tr('mon.set.confirmFramesHint'))}
+              {setting('violationSeconds', tr('mon.set.violation'), 0.5, tr('mon.set.violationHint'))}
+              {setting('incidentCooldownSeconds', tr('mon.set.cooldown'), 30, tr('mon.set.cooldownHint'))}
+              <Field label={tr('mon.set.hazardConfidence')} hint={tr('mon.set.hazardConfidenceHint')}>
                 <Input
                   type="number"
                   min={0.25}
@@ -1118,10 +1143,7 @@ export default function Monitoring() {
           <Panel>
             <PanelBody className="flex items-start gap-3 text-xs text-fg-muted">
               <Cpu className="mt-0.5 size-4 shrink-0" aria-hidden />
-              <span>
-                Frames are sent to the inference service at <span className="font-mono text-fg">{INFERENCE_URL || 'not set'}</span>. Only
-                frames that confirm a violation or hazard are stored, as incident evidence.
-              </span>
+              <span>{rich(tr('mon.framesNote'), { url: <span className="font-mono text-fg">{INFERENCE_URL || tr('mon.notSet')}</span> })}</span>
             </PanelBody>
           </Panel>
         </div>

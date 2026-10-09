@@ -8,6 +8,7 @@
  * service is unreachable, or a model has no evaluation, the status says so.
  */
 
+import { translate } from '@/i18n';
 import type { HazardDetection } from '@/shared/hazards';
 
 export const INFERENCE_URL = (import.meta.env.VITE_PPE_INFERENCE_URL || '').replace(/\/$/, '');
@@ -64,7 +65,7 @@ export const modelFor = (info: ModelInfo, role: ModelRole) => info.models.find((
 
 export async function getModelStatus(): Promise<ModelStatus> {
   if (!INFERENCE_URL) {
-    return { state: 'not-configured', reason: 'No inference service is configured (VITE_PPE_INFERENCE_URL is not set).' };
+    return { state: 'not-configured', reason: translate('ai.notConfigured') };
   }
   let res: Response;
   try {
@@ -72,14 +73,14 @@ export async function getModelStatus(): Promise<ModelStatus> {
   } catch {
     return {
       state: 'unreachable',
-      reason: `The inference service at ${INFERENCE_URL} is not running or not reachable.`,
+      reason: translate('ai.unreachable', { url: INFERENCE_URL }),
     };
   }
   const body = (await res.json().catch(() => ({}))) as Partial<ModelInfo> &
     Partial<Omit<LoadedModel, 'role'>> & { reason?: string; error?: string };
-  if (res.status === 401) return { state: 'unreachable', reason: 'The inference service rejected the access token.' };
+  if (res.status === 401) return { state: 'unreachable', reason: translate('ai.tokenRejected') };
   if (!res.ok || !body.configured) {
-    return { state: 'not-configured', reason: body.reason ?? body.error ?? `The inference service answered ${res.status}.` };
+    return { state: 'not-configured', reason: body.reason ?? body.error ?? translate('ai.answered', { status: res.status }) };
   }
   // An older, single-model service describes just its PPE model.
   const models: LoadedModel[] = body.models ?? [
