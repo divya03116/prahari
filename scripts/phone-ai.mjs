@@ -64,13 +64,22 @@ if (!reachable) {
 
 console.log('  Pointing the website at it and rebuilding (about two minutes)…');
 vercel(['env', 'rm', 'VITE_PPE_INFERENCE_URL', 'production', '--yes']);
-const added = vercel(['env', 'add', 'VITE_PPE_INFERENCE_URL', 'production'], url);
+let added = vercel(['env', 'add', 'VITE_PPE_INFERENCE_URL', 'production'], url);
+// Removing the old value can still be settling; one more try is enough.
+if (added.status !== 0) added = vercel(['env', 'add', 'VITE_PPE_INFERENCE_URL', 'production'], url);
 if (added.status !== 0) {
-  console.error(`\n  Vercel did not accept the setting:\n${(added.stderr || '').slice(-400)}\n`);
+  console.error(`\n  Vercel did not accept the setting (exit ${added.status}):\n${`${added.stdout || ''}${added.stderr || ''}`.slice(-600)}\n`);
   tunnel.kill();
   process.exit(1);
 }
-const rebuilt = vercel(['redeploy', SITE, '--target', 'production']);
+// A rebuild can be turned away for a minute (the host's rate limits); the
+// address stays open meanwhile, so wait and ask again.
+let rebuilt = vercel(['redeploy', SITE, '--target', 'production']);
+for (let attempt = 1; rebuilt.status !== 0 && attempt <= 4; attempt++) {
+  console.log(`  The rebuild was turned away; trying again in a minute (${attempt} of 4)…`);
+  await new Promise((r) => setTimeout(r, 60_000));
+  rebuilt = vercel(['redeploy', SITE, '--target', 'production']);
+}
 if (rebuilt.status !== 0) {
   console.error(`\n  The rebuild did not finish:\n${(rebuilt.stderr || '').slice(-400)}\n`);
   tunnel.kill();
