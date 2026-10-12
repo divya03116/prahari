@@ -8,11 +8,12 @@
  * submitReport then re-checks every file server-side before recording it.
  */
 
+import { doc, getDoc, type Bytes } from 'firebase/firestore';
 import type { UploadTask } from 'firebase/storage';
 
 import { translate } from '@/i18n';
-import { getStorageLazy } from '@/lib/firebase';
-import { LIMITS } from '@/shared/constants';
+import { firebase, getStorageLazy } from '@/lib/firebase';
+import { COLLECTIONS, LIMITS } from '@/shared/constants';
 
 export function validateFile(file: File): string | null {
   if (!LIMITS.attachmentTypes.includes(file.type)) return translate('attach.badType', { name: file.name });
@@ -57,4 +58,17 @@ export async function removeUpload(path: string): Promise<void> {
 export async function attachmentUrl(path: string): Promise<string> {
   const { storage, ref, getDownloadURL } = await sdk();
   return getDownloadURL(ref(storage, path));
+}
+
+/**
+ * An address for a camera incident's evidence frame: its Storage download URL,
+ * or — where the deployment keeps the frame beside the report — the picture
+ * read from there.
+ */
+export async function evidenceUrl(reportId: string, path: string | null | undefined): Promise<string> {
+  if (path) return attachmentUrl(path);
+  const snap = await getDoc(doc(firebase.db, COLLECTIONS.reports, reportId, 'evidence', 'frame'));
+  const data = snap.get('data') as Bytes | undefined;
+  if (!data) throw Object.assign(new Error('The evidence frame is missing.'), { code: 'storage/object-not-found' });
+  return URL.createObjectURL(new Blob([data.toUint8Array().slice()], { type: 'image/jpeg' }));
 }

@@ -27,7 +27,8 @@ export interface PpeEvidence {
   workers: { trackId: number; box: Box; confidence: number; ppe: Record<string, { state: PpeState; confidence: number | null }> }[];
   required: PpeType[];
   frame: { width: number; height: number };
-  evidencePath: string;
+  /** The frame in Cloud Storage; null where it is kept beside the report instead (reports/{id}/evidence/frame). */
+  evidencePath: string | null;
   model: { name: string; architecture: string; backend: 'webgpu' | 'wasm' | 'remote'; classes: string[] };
   settings: PpeSettings;
   detectedAt: TimestampLike;
@@ -45,7 +46,7 @@ export interface HazardEvidence {
   objects?: string[];
   method?: 'pose' | 'box';
   frame: { width: number; height: number };
-  evidencePath: string;
+  evidencePath: string | null;
   models: { role: string; name: string; architecture: string }[];
   settings: { minConfidence: number; incidentCooldownSeconds: number };
   detectedAt: TimestampLike;

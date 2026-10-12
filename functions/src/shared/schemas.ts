@@ -183,12 +183,31 @@ export const deleteReferenceSchema = z.object({ kind: z.enum(REFERENCE_KINDS), i
  * Camera PPE incidents and worker statements
  * ------------------------------------------------------------------ */
 
+/**
+ * The evidence frame itself — a JPEG, base64 — for a deployment that has no
+ * Cloud Storage to upload it to. Small on purpose: it is kept in the database
+ * beside the report (about 200 kB at most).
+ */
+const evidenceImageSchema = z
+  .string()
+  .min(100, 'The evidence image is empty')
+  .max(280_000, 'The evidence image is too large')
+  .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'The evidence image is not valid');
+
+/** A camera incident carries its evidence frame one way or the other, never neither. */
+function oneEvidence(v: { evidence?: unknown; evidenceImage?: unknown }, ctx: z.RefinementCtx): void {
+  if (Boolean(v.evidence) === Boolean(v.evidenceImage)) {
+    ctx.addIssue({ code: 'custom', path: ['evidence'], message: 'An incident needs its evidence frame.' });
+  }
+}
+
 const unit = z.number().min(0).max(1);
 const px = z.number().min(0).max(20_000);
 const boxSchema = z.object({ x1: px, y1: px, x2: px, y2: px });
 const ppeTypeSchema = z.enum(PPE_TYPES);
 
-export const ppeIncidentSchema = z.object({
+export const ppeIncidentSchema = z
+  .object({
   reportId: idSchema,
   installationId: idSchema,
   camera: z.object({
@@ -219,7 +238,8 @@ export const ppeIncidentSchema = z.object({
     )
     .max(30),
   frame: z.object({ width: z.number().int().min(1).max(20_000), height: z.number().int().min(1).max(20_000) }),
-  evidence: attachmentSchema,
+  evidence: attachmentSchema.optional(),
+  evidenceImage: evidenceImageSchema.optional(),
   model: z.object({
     name: trimmed(1, 80, 'Model name'),
     architecture: z.string().trim().max(40),
@@ -237,7 +257,8 @@ export const ppeIncidentSchema = z.object({
   }),
   required: z.array(ppeTypeSchema).min(1).max(PPE_TYPES.length),
   geo: geoSchema.nullable().default(null),
-});
+  })
+  .superRefine(oneEvidence);
 export type PpeIncidentInput = z.infer<typeof ppeIncidentSchema>;
 
 const seenSchema = z.object({ label: z.string().trim().min(1).max(40), confidence: unit, box: boxSchema });
@@ -265,7 +286,8 @@ export const hazardIncidentSchema = z
       method: z.enum(['pose', 'box']).optional(),
     }),
     frame: z.object({ width: z.number().int().min(1).max(20_000), height: z.number().int().min(1).max(20_000) }),
-    evidence: attachmentSchema,
+    evidence: attachmentSchema.optional(),
+    evidenceImage: evidenceImageSchema.optional(),
     models: z
       .array(z.object({ role: z.enum(['ppe', 'general', 'pose', 'fire']), name: trimmed(1, 80, 'Model name'), architecture: z.string().trim().max(40) }))
       .min(1)
@@ -280,6 +302,7 @@ export const hazardIncidentSchema = z
     geo: geoSchema.nullable().default(null),
   })
   .superRefine((v, ctx) => {
+    oneEvidence(v, ctx);
     // The de-duplication key is the type, or type + zone for zone rules — nothing else.
     const zoneRule = v.event.type === 'restricted-zone' || v.event.type === 'blocked-zone';
     if (zoneRule && !v.event.zone) ctx.addIssue({ code: 'custom', path: ['event', 'zone'], message: 'Zone rules need their zone.' });

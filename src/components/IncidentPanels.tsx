@@ -20,7 +20,7 @@ import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
 import { formatDateTime } from '@/lib/format';
 import { api } from '@/services/callables';
-import { attachmentUrl } from '@/services/storage';
+import { evidenceUrl } from '@/services/storage';
 import { LIMITS } from '@/shared/constants';
 import { HAZARDS } from '@/shared/hazards';
 import type { PpeType } from '@/shared/ppe';
@@ -105,11 +105,11 @@ export function CameraEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!ppe?.evidencePath) return;
-    attachmentUrl(ppe.evidencePath)
+    if (!ppe) return;
+    evidenceUrl(report.id, ppe.evidencePath)
       .then(setUrl)
       .catch((err) => setError(errorMessage(err)));
-  }, [ppe?.evidencePath]);
+  }, [report.id, Boolean(ppe), ppe?.evidencePath]);
 
   if (!ppe) return null;
   const violated = new Set(ppe.violations.map((v) => v.trackId));
@@ -212,11 +212,11 @@ export function HazardEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hz?.evidencePath) return;
-    attachmentUrl(hz.evidencePath)
+    if (!hz) return;
+    evidenceUrl(report.id, hz.evidencePath)
       .then(setUrl)
       .catch((err) => setError(errorMessage(err)));
-  }, [hz?.evidencePath]);
+  }, [report.id, Boolean(hz), hz?.evidencePath]);
 
   if (!hz) return null;
   const { width: fw, height: fh } = hz.frame;

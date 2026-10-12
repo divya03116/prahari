@@ -211,6 +211,67 @@ let tier1Id;
   check('every call left an audit entry', (await db.collection('auditLogs').get()).size >= 3);
 }
 
+/* ---------- camera incidents where there is no Cloud Storage ---------- */
+
+console.log('\nCamera incidents without Cloud Storage');
+{
+  // A real, one-pixel JPEG. On this route the frame travels with the call.
+  const JPEG =
+    '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+  const camera = { id: `cam_${Date.now().toString(16)}`, label: 'Gate camera', kind: 'device' };
+  const ppe = () => ({
+    reportId: newId(),
+    installationId: SITE,
+    camera,
+    violations: [{ type: 'helmet', trackId: 1, personConfidence: 0.91, frames: 4, seconds: 3.2 }],
+    workers: [{ trackId: 1, box: { x1: 10, y1: 10, x2: 20, y2: 30 }, confidence: 0.91, ppe: { helmet: { state: 'missing', confidence: null } } }],
+    frame: { width: 640, height: 360 },
+    evidenceImage: JPEG,
+    model: { name: 'ppe-v2', architecture: 'YOLO26', backend: 'remote', classes: ['person', 'helmet', 'vest'] },
+    settings: { minConfidence: 0.6, confirmationFrames: 3, violationSeconds: 3, incidentCooldownSeconds: 300 },
+    required: ['helmet', 'vest'],
+    geo: null,
+  });
+
+  const input = ppe();
+  const made = await post('createPpeIncident', input, worker.token);
+  check('a PPE incident is filed with its frame in the call (no upload, no bucket)', made.status === 200 && made.result?.deduplicated === false, show(made));
+  const doc = await db.collection('reports').doc(input.reportId).get();
+  check('it is scored by the time the reply arrives', doc.get('status') === 'scored' && doc.get('source') === 'camera', `status ${doc.get('status')} ${doc.get('error') ?? ''}`);
+  check('it lists no attachment and no Storage path', doc.get('attachments').length === 0 && doc.get('ppe.evidencePath') === null);
+  const frame = await db.collection('reports').doc(input.reportId).collection('evidence').doc('frame').get();
+  check('the frame is kept beside the report, byte for byte', frame.exists && Buffer.compare(Buffer.from(frame.get('data')), Buffer.from(JPEG, 'base64')) === 0);
+
+  const repeat = ppe();
+  const again = await post('createPpeIncident', repeat, worker.token);
+  check('the same camera and item inside the cooldown is not filed twice', again.status === 200 && again.result?.deduplicated === true && again.result?.reportId === input.reportId, show(again));
+  check('and leaves no stray frame behind', !(await db.collection('reports').doc(repeat.reportId).collection('evidence').doc('frame').get()).exists);
+
+  const notJpeg = await post('createPpeIncident', { ...ppe(), camera: { ...camera, id: `${camera.id}_b` }, evidenceImage: Buffer.alloc(300, 7).toString('base64') }, worker.token);
+  check('bytes that are not a JPEG are refused (400)', notJpeg.status === 400 && /JPEG/.test(notJpeg.error?.message ?? ''), show(notJpeg));
+  const { evidenceImage: _none, ...bare } = ppe();
+  const nothing = await post('createPpeIncident', bare, worker.token);
+  check('an incident with no evidence is refused (400)', nothing.status === 400 && /evidence/i.test(nothing.error?.message ?? ''), show(nothing));
+  const huge = await post('createPpeIncident', { ...ppe(), evidenceImage: 'A'.repeat(300_000) }, worker.token);
+  check('an oversized frame is refused (400)', huge.status === 400, show(huge));
+
+  const fire = {
+    reportId: newId(),
+    installationId: SITE,
+    camera,
+    event: { key: 'fire', type: 'fire', frames: 3, seconds: 1.4, subject: { label: 'fire', confidence: 0.82, box: { x1: 40, y1: 40, x2: 200, y2: 220 } } },
+    frame: { width: 640, height: 360 },
+    evidenceImage: JPEG,
+    models: [{ role: 'fire', name: 'fire-v1', architecture: 'YOLOv8' }],
+    settings: { minConfidence: 0.5, incidentCooldownSeconds: 300 },
+    geo: null,
+  };
+  const hazard = await post('createHazardIncident', fire, worker.token);
+  check('a hazard incident is filed the same way', hazard.status === 200 && hazard.result?.deduplicated === false, show(hazard));
+  const hazardDoc = await db.collection('reports').doc(fire.reportId).get();
+  check('and scored, with its frame kept', hazardDoc.get('status') === 'scored' && (await hazardDoc.ref.collection('evidence').doc('frame').get()).exists, `status ${hazardDoc.get('status')}`);
+}
+
 /* ---------- the first administrator ---------- */
 
 console.log('\nThe first administrator');
