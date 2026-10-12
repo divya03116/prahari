@@ -1041,6 +1041,11 @@ export const en = {
   'demo.label': 'Report narrative',
   'demo.placeholder': 'Describe an unsafe act, unsafe condition or near miss…',
   'demo.empty': 'Type at least a sentence to see the assessment.',
+
+  // ------------------------------------------------------------------ a deployment without file storage
+  'attach.off': 'Photos and files cannot be attached on this site yet: its file storage is not set up.',
+  'mon.noStorage':
+    'Incidents are not filed from this site yet: there is nowhere to keep the evidence photo. Detections are shown on screen only.',
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof en;

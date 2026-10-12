@@ -47,8 +47,8 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  // Firebase Auth's own helper pages.
-  if (url.pathname.startsWith('/__/')) return;
+  // Firebase Auth's own helper pages, and the server functions some deployments host on this site.
+  if (url.pathname.startsWith('/__/') || url.pathname.startsWith('/api/')) return;
 
   // Every route is the same single page: serve it from the cache at once.
   if (request.mode === 'navigate') {

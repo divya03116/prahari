@@ -17,7 +17,7 @@ import { rich, translate, useI18n, type MessageKey } from '@/i18n';
 import { ppeKey, reportTypeKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
-import { firebase } from '@/lib/firebase';
+import { firebase, uploadsEnabled } from '@/lib/firebase';
 import { api } from '@/services/callables';
 import { startUpload } from '@/services/storage';
 import { COLLECTIONS } from '@/shared/constants';
@@ -363,7 +363,7 @@ export default function Monitoring() {
 
   const fileIncident = useCallback(
     async (events: ViolationEvent[], statuses: WorkerStatus[], frame: HTMLCanvasElement) => {
-      if (!user || !ppeModel) return;
+      if (!user || !ppeModel || !uploadsEnabled) return;
       const c = cfgRef.current; // the camera name may have been filled in automatically after start
       const reportId = doc(collection(firebase.db, COLLECTIONS.reports)).id;
       try {
@@ -411,7 +411,7 @@ export default function Monitoring() {
 
   const fileHazard = useCallback(
     async (e: HazardEvent, frame: HTMLCanvasElement) => {
-      if (!user || !info) return;
+      if (!user || !info || !uploadsEnabled) return;
       const c = cfgRef.current;
       const reportId = doc(collection(firebase.db, COLLECTIONS.reports)).id;
       const label = HAZARDS[e.type].label;
@@ -818,6 +818,7 @@ export default function Monitoring() {
               }
             />
             <PanelBody className="flex flex-col gap-3">
+              {!uploadsEnabled && <Alert tone="warning">{tr('mon.noStorage')}</Alert>}
               {camError && <Alert tone="critical">{camError}</Alert>}
               {detectError && <Alert tone="warning">{detectError}</Alert>}
               <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border bg-black">

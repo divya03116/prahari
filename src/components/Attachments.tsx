@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { rich, useI18n } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
+import { uploadsEnabled } from '@/lib/firebase';
 import { formatBytes } from '@/lib/format';
 import { isConnectionError, type QueuedFile } from '@/offline/outbox';
 import { attachmentPath, attachmentUrl, removeUpload, startUpload, validateFile } from '@/services/storage';
@@ -114,6 +115,9 @@ export function AttachmentPicker({
     setItems((list) => list.filter((i) => i.key !== item.key));
     if (item.state === 'done') await removeUpload(item.path).catch(() => undefined);
   };
+
+  // No Cloud Storage on this deployment: the form says so, the compact button is simply not offered.
+  if (!uploadsEnabled) return variant === 'button' ? null : <p className="text-sm text-fg-subtle">{t('attach.off')}</p>;
 
   const full = items.length >= LIMITS.attachmentsMax;
 

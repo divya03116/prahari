@@ -46,6 +46,15 @@ export const isConfigured = Boolean(config.apiKey && config.projectId && config.
 export const usingEmulators = env.VITE_USE_EMULATORS === 'true';
 
 /**
+ * Where the callables are served when they are not Cloud Functions: a path on
+ * this site (the Vercel deployment answers at /api/fn) or a full URL.
+ */
+const functionsOrigin = env.VITE_FUNCTIONS_ORIGIN;
+
+/** 'off' where the project has no Cloud Storage bucket: nothing offers to attach a file. */
+export const uploadsEnabled = env.VITE_UPLOADS !== 'off';
+
+/**
  * Must equal REGION in functions/src/shared/constants.ts. A mismatch shows up in
  * the browser as a CORS failure, which reads like an unrelated bug.
  */
@@ -97,7 +106,10 @@ export const firebase = {
 let functionsP: Promise<Functions> | null = null;
 export function getFunctionsLazy(): Promise<Functions> {
   functionsP ??= import('firebase/functions').then(({ getFunctions, connectFunctionsEmulator }) => {
-    const f = getFunctions(required(app, 'App'), region);
+    const a = required(app, 'App');
+    // Given a URL in place of a region, the SDK sends every call to <that URL>/<name>.
+    if (functionsOrigin) return getFunctions(a, new URL(functionsOrigin, window.location.origin).href.replace(/\/$/, ''));
+    const f = getFunctions(a, region);
     if (usingEmulators) connectFunctionsEmulator(f, '127.0.0.1', 5001);
     return f;
   });
