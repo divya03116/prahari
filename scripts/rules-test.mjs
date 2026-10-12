@@ -432,6 +432,30 @@ await expectCall('camera incident with an unknown PPE type is refused', 'INVALID
 await expectCall('unauthenticated camera incident is refused', 'UNAUTHENTICATED', 'createPpeIncident', await ppePayload(reviewer), null);
 await expectHttp('browsers cannot read the de-duplication state', 'DENIED', () => fetch(`${FS_REST}/ppeCooldowns?pageSize=1`, { headers: H(admin.token) }));
 
+// A deployment without Cloud Storage: the evidence frame travels with the call
+// and is kept beside the report. (A real, one-pixel JPEG.)
+const JPEG =
+  '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+{
+  const { evidence: _upload, ...rest } = await ppePayload(reviewer, ['gloves']);
+  const carried = { ...rest, camera: { ...rest.camera, id: `${camId}_inline` } };
+  const made = await callFn('createPpeIncident', { ...carried, evidenceImage: JPEG }, reviewer.token);
+  const id = made.result?.reportId;
+  record(made.status === 200 && made.result?.deduplicated === false, 'a camera incident can carry its evidence frame instead of an upload', made.status === 200 ? 'created' : made.error?.status, 'created', made.error?.message);
+  const kept = id ? await db.collection('reports').doc(id).collection('evidence').doc('frame').get() : null;
+  record(kept?.exists === true && kept.get('data').length === Buffer.from(JPEG, 'base64').length, 'the frame is kept beside the report, byte for byte', kept?.exists ? 'kept' : 'missing', 'kept');
+  const frame = `${FS_REST}/reports/${id}/evidence/frame`;
+  await expectHttp('the reporter can read the frame of their own incident', 'ALLOWED', () => fetch(frame, { headers: H(reviewer.token) }));
+  await expectHttp('an officer can read it', 'ALLOWED', () => fetch(frame, { headers: H(officer.token) }));
+  await expectHttp('someone who cannot see the report cannot read its frame', 'DENIED', () => fetch(frame, { headers: H(phone.token) }));
+  await expectHttp('nobody can write a frame from the browser, not even an admin', 'DENIED', () =>
+    commitCreate(admin.token, `reports/${id}/evidence/forged`, { contentType: S('image/jpeg') }, []),
+  );
+  await expectCall('a frame that is not a JPEG is refused', 'INVALID_ARGUMENT', 'createPpeIncident', { ...carried, reportId: db.collection('reports').doc().id, evidenceImage: Buffer.alloc(300, 7).toString('base64') }, reviewer.token);
+  await expectCall('an incident with no evidence at all is refused', 'INVALID_ARGUMENT', 'createPpeIncident', { ...carried, reportId: db.collection('reports').doc().id }, reviewer.token);
+  await expectCall('an oversized frame is refused', 'INVALID_ARGUMENT', 'createPpeIncident', { ...carried, reportId: db.collection('reports').doc().id, evidenceImage: 'A'.repeat(300_000) }, reviewer.token);
+}
+
 if (firstId) {
   // Wait for the scoring trigger, then check the structured record.
   let scored = null;

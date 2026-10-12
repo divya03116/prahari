@@ -10,7 +10,7 @@
  */
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, type DocumentReference, type Transaction } from 'firebase-admin/firestore';
 
 import { audit, db, FieldValue, guard, internal, parse, rateLimit } from '../lib/core.js';
 import { COLLECTIONS } from '../shared/constants.js';
@@ -20,6 +20,34 @@ import { hazardIncidentSchema, ppeIncidentSchema, statementSchema } from '../sha
 import { verifyUploads } from './reports.js';
 
 const COOLDOWNS = 'ppeCooldowns';
+
+/**
+ * The evidence frame of a camera incident. With Cloud Storage it is an upload,
+ * checked there like any attachment. A deployment without Storage sends the
+ * frame itself, a small JPEG, which is kept beside the report in
+ * reports/{id}/evidence/frame and can be read by whoever may read the report.
+ */
+async function evidenceOf(
+  uid: string,
+  input: { reportId: string; evidence?: { path: string; name: string }; evidenceImage?: string },
+): Promise<{ file: Awaited<ReturnType<typeof verifyUploads>>[number] | null; image: Buffer | null }> {
+  if (input.evidence) {
+    const [file] = await verifyUploads(`attachments/${uid}/${input.reportId}/`, [input.evidence]);
+    if (!file.contentType.startsWith('image/')) throw new HttpsError('invalid-argument', 'Evidence must be an image.');
+    return { file, image: null };
+  }
+  const image = Buffer.from(input.evidenceImage ?? '', 'base64');
+  // Every JPEG file starts FF D8 FF.
+  if (image.length < 100 || image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff) {
+    throw new HttpsError('invalid-argument', 'Evidence must be a JPEG image.');
+  }
+  return { file: null, image };
+}
+
+/** Writes the frame beside its report, in the same transaction that files the report. */
+function keepFrame(tx: Transaction, report: DocumentReference, image: Buffer | null, at: Timestamp): void {
+  if (image) tx.set(report.collection('evidence').doc('frame'), { contentType: 'image/jpeg', size: image.length, data: image, createdAt: at });
+}
 const MAX_STATEMENTS = 20;
 
 /** Day shift 06:00–18:00 at the site's clock (India Standard Time). */
@@ -52,10 +80,7 @@ export const createPpeIncident = onCall(async (request) => {
       throw new HttpsError('failed-precondition', 'That installation is not available.');
     }
     const ref = db.collection(COLLECTIONS.reports).doc(input.reportId);
-    const [evidence] = await verifyUploads(`attachments/${caller.uid}/${input.reportId}/`, [input.evidence]);
-    if (!evidence.contentType.startsWith('image/')) {
-      throw new HttpsError('invalid-argument', 'Evidence must be an image.');
-    }
+    const evidence = await evidenceOf(caller.uid, input);
 
     const now = Timestamp.now();
     const cooldownMs = input.settings.incidentCooldownSeconds * 1000;
@@ -89,7 +114,7 @@ export const createPpeIncident = onCall(async (request) => {
         shift: shiftAt(now.toDate()),
         type: 'unsafe-act',
         contractor: false,
-        attachments: [evidence],
+        attachments: evidence.file ? [evidence.file] : [],
         source: 'camera',
         geo: input.geo,
         camera: input.camera,
@@ -98,7 +123,7 @@ export const createPpeIncident = onCall(async (request) => {
           workers: input.workers,
           required: input.required,
           frame: input.frame,
-          evidencePath: evidence.path,
+          evidencePath: evidence.file?.path ?? null,
           model: input.model,
           settings: input.settings,
           detectedAt: now,
@@ -109,6 +134,7 @@ export const createPpeIncident = onCall(async (request) => {
         verdictDecision: null,
         createdAt: FieldValue.serverTimestamp(),
       });
+      keepFrame(tx, ref, evidence.image, now);
       audit('incident.ppe', caller, ref.id, { camera: input.camera.id, types: fresh }, tx);
       return { deduplicated: false as const, reportId: ref.id, types: fresh };
     });
@@ -121,7 +147,7 @@ export const createPpeIncident = onCall(async (request) => {
 /**
  * A confirmed camera hazard — unsafe act, unsafe condition or near miss — as a
  * report of that type. Same guarantees as PPE incidents: the evidence frame is
- * verified in Storage, and one incident per camera and hazard (per zone for
+ * checked (see evidenceOf), and one incident per camera and hazard (per zone for
  * zone rules) per cooldown window, enforced in a transaction.
  */
 export const createHazardIncident = onCall(async (request) => {
@@ -135,10 +161,7 @@ export const createHazardIncident = onCall(async (request) => {
       throw new HttpsError('failed-precondition', 'That installation is not available.');
     }
     const ref = db.collection(COLLECTIONS.reports).doc(input.reportId);
-    const [evidence] = await verifyUploads(`attachments/${caller.uid}/${input.reportId}/`, [input.evidence]);
-    if (!evidence.contentType.startsWith('image/')) {
-      throw new HttpsError('invalid-argument', 'Evidence must be an image.');
-    }
+    const evidence = await evidenceOf(caller.uid, input);
 
     const now = Timestamp.now();
     const e = input.event;
@@ -162,14 +185,14 @@ export const createHazardIncident = onCall(async (request) => {
         shift: shiftAt(now.toDate()),
         type: HAZARDS[e.type].kind,
         contractor: false,
-        attachments: [evidence],
+        attachments: evidence.file ? [evidence.file] : [],
         source: 'camera',
         geo: input.geo,
         camera: input.camera,
         hazard: {
           ...e,
           frame: input.frame,
-          evidencePath: evidence.path,
+          evidencePath: evidence.file?.path ?? null,
           models: input.models,
           settings: input.settings,
           detectedAt: now,
@@ -180,6 +203,7 @@ export const createHazardIncident = onCall(async (request) => {
         verdictDecision: null,
         createdAt: FieldValue.serverTimestamp(),
       });
+      keepFrame(tx, ref, evidence.image, now);
       audit('incident.hazard', caller, ref.id, { camera: input.camera.id, hazard: e.key }, tx);
       return { deduplicated: false as const, reportId: ref.id, type: e.type };
     });

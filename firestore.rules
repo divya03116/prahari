@@ -116,6 +116,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // A camera incident's evidence frame, where the deployment keeps it beside
+    // the report instead of in Cloud Storage. Whoever may read the report may
+    // read its frame; only createPpeIncident / createHazardIncident write it.
+    match /reports/{reportId}/evidence/{frameId} {
+      allow read: if canSee(get(/databases/$(database)/documents/reports/$(reportId)).data);
+      allow write: if false;
+    }
+
     // Actions carry the report's author (reportedBy) so the same rule applies.
     match /actions/{actionId} {
       allow read: if canSee(resource.data);
