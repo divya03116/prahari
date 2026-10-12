@@ -1,9 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm ci",
-  "buildCommand": "npm run sync && npm run typecheck && vite build --mode vercel",
+  "installCommand": "npm ci && npm --prefix functions ci",
+  "buildCommand": "npm run functions:build && npm run sync && npm run typecheck && VITE_FUNCTIONS_ORIGIN=/api/fn VITE_UPLOADS=off vite build --mode vercel",
   "outputDirectory": "dist",
   "cleanUrls": false,
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",
