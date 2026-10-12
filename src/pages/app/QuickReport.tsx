@@ -18,7 +18,7 @@ import { rich, translate, useI18n } from '@/i18n';
 import { reportTypeKey } from '@/i18n/labels';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/errors';
-import { firebase } from '@/lib/firebase';
+import { firebase, uploadsEnabled } from '@/lib/firebase';
 import { submitOrQueue } from '@/offline/submit';
 import { detectImage, getModelStatus, modelFor } from '@/ai/inference';
 import { speechSupported } from '@/ai/speech';
@@ -285,7 +285,7 @@ function QuickReportForm({ onQueued }: { onQueued: () => void }) {
 
       {error && <Alert tone="critical">{error}</Alert>}
 
-      <div role="radiogroup" aria-label={t('quick.howToReport')} className={cn('grid gap-2', attachTo ? 'grid-cols-2' : 'grid-cols-3')}>
+      <div role="radiogroup" aria-label={t('quick.howToReport')} className={cn('grid gap-2', attachTo || !uploadsEnabled ? 'grid-cols-2' : 'grid-cols-3')}>
         {(
           [
             ['voice', <Mic key="m" className="size-5" />, t('quick.mode.voice')],
@@ -293,7 +293,7 @@ function QuickReportForm({ onQueued }: { onQueued: () => void }) {
             ['photo', <Camera key="c" className="size-5" />, t('quick.mode.photo')],
           ] as const
         )
-          .filter(([value]) => !(attachTo && value === 'photo'))
+          .filter(([value]) => !((attachTo || !uploadsEnabled) && value === 'photo'))
           .map(([value, icon, label]) => (
           <button
             key={value}
