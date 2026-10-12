@@ -42,6 +42,24 @@ export const PPE_LABEL: Record<PpeType, string> = {
   goggles: 'Safety goggles',
 };
 
+/**
+ * What each worker in a camera incident was missing, for the report: the items
+ * confirmed over time, and any other required item not on them in the evidence
+ * frame (seen once, so stated separately and never as a confirmed violation).
+ */
+export function missingByWorker(e: {
+  violations: { type: PpeType; trackId: number }[];
+  workers: { trackId: number; ppe: Record<string, { state: 'present' | 'missing' } | undefined> }[];
+  required: PpeType[];
+}): { trackId: number; confirmed: PpeType[]; alsoInFrame: PpeType[] }[] {
+  return [...new Set(e.violations.map((v) => v.trackId))].map((trackId) => {
+    const confirmed = PPE_TYPES.filter((t) => e.violations.some((v) => v.trackId === trackId && v.type === t));
+    const seen = e.workers.find((w) => w.trackId === trackId)?.ppe ?? {};
+    const alsoInFrame = e.required.filter((t) => !confirmed.includes(t) && seen[t]?.state === 'missing');
+    return { trackId, confirmed, alsoInFrame };
+  });
+}
+
 export interface PpeSettings {
   /** Minimum model confidence for any detection to count. */
   minConfidence: number;

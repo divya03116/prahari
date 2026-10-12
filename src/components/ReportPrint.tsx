@@ -19,6 +19,7 @@ import { actionStatusKey, ppeKey, reportTypeKey, shiftKey, sourceKey, tierKey, v
 import { formatBytes, formatDate, formatDateTime } from '@/lib/format';
 import type { Hit } from '@/shared/engine';
 import { HAZARDS } from '@/shared/hazards';
+import { missingByWorker } from '@/shared/ppe';
 import { NOT_SPECIFIED } from '@/shared/structure';
 import type { ReportDoc, WithId } from '@/shared/types';
 
@@ -270,8 +271,16 @@ export function ReportPrint({ report: r }: { report: WithId<ReportDoc> }) {
                     <td>{formatDateTime(r.ppe.detectedAt)}</td>
                   </tr>
                   <tr>
-                    <td className="pd-label">{t('incident.violation')}</td>
-                    <td>{[...new Set(r.ppe.violations.map((v) => t(ppeKey(v.type))))].join(', ')}</td>
+                    <td className="pd-label">{t('incident.missingPpe')}</td>
+                    <td>
+                      {missingByWorker(r.ppe).map((w) => (
+                        <div key={w.trackId}>
+                          {t('incident.worker', { id: w.trackId })}: <strong>{w.confirmed.map((item) => t(ppeKey(item))).join(', ')}</strong>
+                          {w.alsoInFrame.length > 0 &&
+                            ` · ${t('incident.alsoInFrame', { items: w.alsoInFrame.map((item) => t(ppeKey(item))).join(', ') })}`}
+                        </div>
+                      ))}
+                    </td>
                   </tr>
                   <tr>
                     <td className="pd-label">{t('incident.confirmedOver')}</td>
