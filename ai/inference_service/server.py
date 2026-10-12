@@ -274,8 +274,23 @@ class Handler(BaseHTTPRequestHandler):
             super().log_message(fmt, *args)
 
 
+def warm_up() -> None:
+    """Runs one blank frame through every model. The first prediction after a
+    start builds the device's kernels and can take half a minute; done here, the
+    first real camera frame is answered at normal speed instead of timing out."""
+    from PIL import Image
+
+    blank = Image.new("RGB", (640, 384))
+    for role, (model, device) in _models.items():
+        try:
+            model.predict(blank, conf=MIN_CONF, device=device, verbose=False)
+        except Exception as exc:  # noqa: BLE001
+            print(f"  {role}: warm-up failed — {exc}", flush=True)
+
+
 def main() -> None:
     load_models()
+    warm_up()
     ready = ", ".join(f"{r} ({i['name']})" for r, i in _infos.items()) or "none"
     print(f"PRAHARI inference service on http://{HOST}:{PORT}  — models: {ready}", flush=True)
     for role, err in _errors.items():
