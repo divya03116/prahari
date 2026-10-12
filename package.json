@@ -12,7 +12,7 @@
     "dev": "vite",
     "prebuild": "npm run sync",
     "build": "npm run typecheck && vite build",
-    "build:vercel": "npm run sync && npm run typecheck && vite build --mode vercel --outDir deploy/prahari --emptyOutDir && node -e \"const c=require('./vercel.json');for(const k of ['installCommand','buildCommand','outputDirectory'])delete c[k];require('fs').writeFileSync('deploy/prahari/vercel.json',JSON.stringify(c,null,2))\"",
+    "build:vercel": "npm run sync && npm run typecheck && vite build --mode vercel --outDir deploy/prahari --emptyOutDir && node -e \"const c=require('./vercel.json');for(const k of ['installCommand','buildCommand','outputDirectory','functions'])delete c[k];require('fs').writeFileSync('deploy/prahari/vercel.json',JSON.stringify(c,null,2))\"",
     "typecheck": "tsc -b",
     "preview": "vite preview --port 4173 --strictPort",
     "functions:build": "npm --prefix functions run build",
@@ -26,7 +26,8 @@
     "test:cleanup": "node scripts/cleanup-test.mjs",
     "test:ppe": "npm run functions:build && node scripts/ppe-test.mjs",
     "test:hazards": "npm run functions:build && node scripts/hazard-test.mjs",
-    "test:alerts": "npm run functions:build && node scripts/alerts-test.mjs"
+    "test:alerts": "npm run functions:build && node scripts/alerts-test.mjs",
+    "test:vercel": "npm run functions:build && firebase emulators:exec --only auth,firestore --project demo-prahari \"node scripts/vercel-test.mjs\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
