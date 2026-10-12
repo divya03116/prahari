@@ -8,7 +8,7 @@
  */
 
 import './options.js';
-import { initializeApp, getApps } from 'firebase-admin/app';
+import { cert, initializeApp, getApps, type Credential } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore, type Transaction } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
@@ -18,7 +18,25 @@ import type { ZodType } from 'zod';
 
 import { COLLECTIONS, DEFAULT_ROLE, hasRole, type Role, TRUSTED_SIGN_IN_PROVIDERS } from '../shared/constants.js';
 
-if (!getApps().length) initializeApp();
+/** Set when FIREBASE_SERVICE_ACCOUNT is present but unusable. Never contains any part of the key. */
+export let credentialProblem: string | null = null;
+
+if (!getApps().length) {
+  // On Firebase a function runs as the project's own service account. On any
+  // other host (the Vercel deployment, ../vercel.ts) that account's key is
+  // supplied in FIREBASE_SERVICE_ACCOUNT: the JSON file the console downloads,
+  // pasted as it is or base64-encoded.
+  const key = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
+  let credential: Credential | undefined;
+  if (key) {
+    try {
+      credential = cert(JSON.parse(key.startsWith('{') ? key : Buffer.from(key, 'base64').toString('utf8')));
+    } catch {
+      credentialProblem = 'FIREBASE_SERVICE_ACCOUNT is not a service-account key file from the Firebase console.';
+    }
+  }
+  initializeApp(credential ? { credential } : undefined);
+}
 
 export const db = getFirestore();
 export const auth = getAuth();
