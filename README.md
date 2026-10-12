@@ -243,6 +243,16 @@ opened early, and icons, the poster image and the video are cacheable for a week
 | `getAlertSettings` / `setAlertSettings` | reviewer / installation-manager | A person's own Tier 1 alert channels (email, WhatsApp number), and whether the server is set up to send on each. |
 | `sendTestAlert` | admin | Sends a clearly marked test alert to the caller and returns exactly what each provider answered. |
 
+**The same handlers without Cloud Functions.** `functions/src/vercel.ts` puts the
+callables above behind a plain HTTPS endpoint that speaks the protocol the web
+SDK already uses (`POST {"data": …}` with the caller's ID token as the bearer;
+`{"result": …}` or `{"error": {status, message}}` back). The token is verified
+with the Admin SDK, every handler still goes through `guard()` and `parse()`,
+and only the callables in the table are reachable by name. There are no
+Firestore triggers off Firebase, so a report is scored by the request that files
+it, with the very same `scoreReport` handler. The live site runs this way — see
+[The server on Vercel](#the-server-on-vercel-no-blaze-plan).
+
 ### Tier 1 alerts
 
 When a report is scored **Tier 1 · Critical**, `lib/alerts.ts` tells the people who
@@ -398,6 +408,8 @@ Hindi/Assamese/Bengali words work) supports whole-word `array-contains` search.
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` | Public web-app config from the Firebase console |
 | `VITE_FUNCTIONS_REGION` | Must equal `FUNCTIONS_REGION` (`us-central1`) |
 | `VITE_USE_EMULATORS` | `true` to use the local emulator suite |
+| `VITE_FUNCTIONS_ORIGIN` | Leave out when the server is Cloud Functions. A path on the site (`/api/fn`) or a URL: the callables are then called there instead. Set for the Vercel build in `vercel.json` |
+| `VITE_UPLOADS` | `off` when the project has no Cloud Storage bucket: nothing offers to attach a file, and camera incidents (which need an evidence frame) are not filed. Set for the Vercel build in `vercel.json` |
 | `VITE_PPE_INFERENCE_URL` | Base URL of the PPE inference service (e.g. `http://127.0.0.1:8765`). Empty → monitoring shows *AI Model Not Configured*. In production also add it to `connect-src` in the CSP in `firebase.json` |
 | `VITE_PPE_INFERENCE_TOKEN` | Optional shared secret; must match `PPE_TOKEN` on the service |
 
@@ -409,6 +421,13 @@ address allowed to claim the first administrator role (see [§11](#11-deployment
 the emulator's `functions/.env.local` leaves it empty, so nobody can claim there.
 The Tier 1 alert settings (`ALERT_*`, `WHATSAPP_*`) go in the same file; see
 [Tier 1 alerts](#tier-1-alerts).
+
+On Vercel the server reads the same names from the project's *Environment
+Variables*, plus one of its own: `FIREBASE_SERVICE_ACCOUNT`, the service-account
+key file from the Firebase console (its whole content, as downloaded or
+base64-encoded). That key can do anything in the project. It belongs in Vercel's
+settings and nowhere else — never in a `VITE_*` variable, an `.env` file that is
+built into the site, or the repository.
 
 The inference service's own variables are listed in [§12](#12-ai-safety-features).
 
@@ -470,16 +489,61 @@ names are generic.
 
 ## 11. Deployment
 
-**The live setup (`prahari-2` + Vercel) — two one-click scripts on Windows:**
+**The live setup (`prahari-2` + Vercel) — one-click scripts on Windows:**
 
 | Script | What it does | Needs first |
 |---|---|---|
-| `deploy-backend.bat` | Signs in to Firebase (browser *Allow*), builds and deploys the security rules, the 60 indexes, the storage rules and every Cloud Function to `prahari-2` | Blaze plan; Storage opened once (*Get started*, `us-central1`) |
+| `deploy-database.bat` | Signs in to Firebase (browser *Allow*) and publishes the security rules and the 60 indexes to `prahari-2` | — (free plan) |
+| `deploy-backend.bat` | The same, plus the storage rules and every Cloud Function | Blaze plan; Storage opened once (*Get started*, `us-central1`) |
 | `publish-ai.bat` | Signs in to Hugging Face (paste a Write token), uploads the AI service and models as the public Space `<user>/prahari-ai`, waits until it serves, then points the website at it (Vercel env + rebuild) | a free Hugging Face account |
 | `start-ai.bat` | Runs the AI service on this computer only (until the Space exists) | — |
 
 After `deploy-backend.bat`: sign in on the site with the bootstrap address and open
 `/app/settings?setup=admin` → *Become the first administrator*.
+
+### The server on Vercel (no Blaze plan)
+
+Cloud Functions need the Blaze plan. The live site does not use them: the same
+server code runs as Vercel functions next to the website (`api/fn/[name].js` →
+`functions/src/vercel.ts`, see [§3](#3-backend-service-layer)), which costs
+nothing. `vercel.json` builds it on every push — the install step also installs
+`functions/`, and the build compiles it and sets `VITE_FUNCTIONS_ORIGIN=/api/fn`
+and `VITE_UPLOADS=off` for the website.
+
+Setting it up, once:
+
+1. Firebase console → *Project settings* → *Service accounts* → *Generate new
+   private key*. In Vercel → the project → *Settings* → *Environment Variables*,
+   add `FIREBASE_SERVICE_ACCOUNT` with the whole content of that file as the
+   value (Production; tick *Sensitive*), and `BOOTSTRAP_ADMIN_EMAIL` with the
+   address that will be the first administrator. Then *Deployments* → *Redeploy*.
+   Delete the downloaded file afterwards.
+2. Run `deploy-database.bat` (rules and indexes).
+3. Open `https://<site>/api/health`. It answers `{"ok":true}` once the key is in
+   place and Google accepts it; otherwise it says what is missing. Then sign in
+   with the administrator address and open `/app/settings?setup=admin` →
+   *Become the first administrator*.
+
+Until step 1 is done every call is answered *unavailable*, which the app treats
+like a weak connection: a report filed meanwhile is kept on the device and sent
+by itself once the server is ready.
+
+What this route does not have, and what the site does about it:
+
+- **No file storage.** A new Firebase project cannot create a Storage bucket on
+  the free plan. With `VITE_UPLOADS=off` the report forms offer no attachment,
+  the photo report is hidden, and live monitoring shows what it detects but files
+  no incident (an incident must carry its evidence frame). Reports by voice and
+  text, scoring, actions, verdicts, alerts, PDF export and offline use all work.
+- **No scheduled jobs.** The daily orphan-attachment sweep does not run; without
+  Storage there is nothing for it to sweep.
+- **One scorer.** If you later deploy the Cloud Functions as well, remove
+  `VITE_FUNCTIONS_ORIGIN` (and `VITE_UPLOADS`) from the build command in
+  `vercel.json` so the site calls them instead — otherwise the Firestore trigger
+  and the Vercel function would both score each report.
+
+To try the route on your own machine, see `npm run test:vercel` and
+`scripts/vercel-local.mjs` in [§13](#13-testing).
 
 **From scratch, for another project:**
 
@@ -499,8 +563,9 @@ After `deploy-backend.bat`: sign in on the site with the bootstrap address and o
    npm run build
    npx firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting
    ```
-   **Or host the website on Vercel** (the backend still deploys to Firebase):
-   put the web config in `.env.vercel`, then
+   **Or host the website on Vercel and keep the backend on Firebase**
+   (`npm run build:vercel` builds the site without `/api`): put the web config
+   in `.env.vercel`, then
    ```bash
    npx firebase deploy --only firestore:rules,firestore:indexes,storage,functions --project <project-id>
    npm run build:vercel          # → deploy/prahari, with vercel.json headers
@@ -711,9 +776,11 @@ time the app, not that cold start.
 | `npm run test:rules` | 117 adversarial checks with real tokens: Firestore rules, Storage rules, who may read which report/action/attachment (own, installation, whole register, list queries), phone and Apple accounts (verified, own-only, no email in a phone profile), the one-time first-admin claim, callable authorisation and scoping, camera PPE and hazard incidents (types, zones, forged keys, deduplication), photo reports and statements, and Tier 1 alert records and preferences (officers read, nobody forges, nobody sets their own channels directly) |
 | `npm run test:alerts` | 41 checks of Tier 1 alerts with the email and WhatsApp providers replaced by a local stand-in server: message content (narrative as written, escaped, reporter never identified), who is told, number validation, Resend and Brevo request shapes, the WhatsApp template call, and honest results for *not configured*, partial failure and total failure |
 | `npm run test:cleanup` | The orphan-attachment sweep deletes only what it should |
+| `npm run test:vercel` | 54 checks of the Vercel server route. The real functions in `api/` are served locally and called with plain HTTP and with the Firebase web SDK, the Admin SDK set up from a (throwaway) service-account key as on Vercel: only listed callables are reachable; 401 / 403 / 400 / 409 with the server's own sentences; a report is scored, its actions opened and its Tier 1 alert recorded **by the time the reply arrives**, and never twice; the first-administrator claim; a missing or mis-pasted key answers 503 without echoing it. Starts its own Auth and Firestore emulators — stop `npm run emulators` first |
 | `npm run test:e2e` | 61 Playwright tests (4 are opt-in with the real models, 1 needs the production build): auth flows (sign-up → verify → sign-in, reset, bad links, open redirect; Google/Apple/phone offered; phone sign-in with an SMS code from the Auth emulator, wrong code refused), full report lifecycle with upload, register search/filters/pagination, verdicts and actions, admin users/reference/audit, role guards, report visibility (a reviewer sees only their own; a manager only their installation's), dashboard, voice/text reporting with GPS and structuring, speech fallback, camera start/stop with a real (fake-device) stream (and starting by itself once a refused camera permission is allowed) and honest *AI Model Not Configured* status, combined camera + statement incidents, layout at 375 / 768 / 1280 / 1440 / 1920 px with no horizontal page scroll and the phone tab bar; the four interface languages (sign-in, menu, register, a report, the hazard report, the dashboard — and that a report's text is identical before and after switching); PDF export (a real PDF is produced; the printed document in English and Hindi); reporting offline with a photo and automatic sending on reconnect; Tier 1 alert settings and the record of what was sent; any console error fails a test |
 | `PREVIEW=1 npm run test:e2e` | The same suite against the production build (`npm run build` first) with the CSP enforced and the service worker active — including that the app opens with no connection |
 | `npm test` | engine + PPE + hazards + alerts + rules + cleanup + E2E |
+| `node scripts/vercel-local.mjs` | Not a test by itself: serves the Vercel functions where the Functions emulator would be, so `npm run seed` and `npm run test:e2e` run unchanged against the Vercel route (start the emulators with `--only auth,firestore,storage`) |
 | `PPE_FAKE_CAMERA=<file.mjpeg> npx playwright test monitoring-model` | Opt-in, with the inference service running: Chrome's fake camera plays held-out test photos (made by `python ai/ppe/make_test_video.py`); a worker without a helmet must produce exactly **one** automatic incident with its evidence frame, and the repeat must be suppressed by the cooldown |
 | `npm run test:hazards` | 30 checks of the hazard rules: zones, posture, vehicle motion and proximity, obstruction, phone use, fire, confirmation, cooldown, photo analysis, narratives and structuring |
 | `PPE_HAZARD_CAMERA=… PPE_FIRE_PHOTO=… npx playwright test hazards-model` | Opt-in, with the inference service running: the camera files a restricted-zone unsafe act and a fire-or-smoke unsafe condition by itself from held-out test images; a fire-scene photo is checked, filled in and sent automatically; Cancel stops the send (media from `python ai/hazards/make_hazard_media.py`) |
@@ -762,11 +829,12 @@ time the app, not that cold start.
   times; the evidence frame lets an officer dismiss a false alarm in seconds.
 - **Licensing:** the PPE dataset and Ultralytics YOLO are AGPL-3.0 (see
   `ai/README.md`).
-- **Dependency advisories.** `npm audit --omit=dev` flags four high-severity
-  advisories in `@grpc/grpc-js`, which the Firebase web SDK installs for its
-  Node-only build and pins to an old release. It is not part of the browser
-  bundle — no file in `dist/` contains it — so the deployed site is not exposed;
-  it can be cleared with an `overrides` entry for `@grpc/grpc-js` in
-  `package.json`. The Cloud Functions report **0** vulnerabilities. `npm audit`
-  also reports moderate advisories inside the `firebase-tools` CLI's dependency
-  tree (development only, no fixed release yet).
+- **The live site has no file storage** (free plan): no attachments, no photo
+  report, no camera incidents there — see
+  [The server on Vercel](#the-server-on-vercel-no-blaze-plan).
+- **Dependency advisories.** `npm audit --omit=dev` reports **0** for the web app
+  and for `functions/`. The Firebase web SDK pins an old `@grpc/grpc-js` for its
+  Node-only build (never part of the browser bundle); an `overrides` entry in
+  `package.json` lifts it to a patched release. A plain `npm audit` still lists
+  advisories inside development tools — mostly the `firebase-tools` CLI's
+  dependency tree — which are not shipped.
