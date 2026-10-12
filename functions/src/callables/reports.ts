@@ -43,6 +43,9 @@ export async function verifyUploads(
   prefix: string,
   list: { path: string; name: string }[],
 ): Promise<{ path: string; name: string; size: number; contentType: string }[]> {
+  // Nothing attached, nothing to look up — and a project without Cloud Storage
+  // has no bucket to ask for.
+  if (!list.length) return [];
   const bucket = storage.bucket();
   const out = [];
   for (const a of list) {
