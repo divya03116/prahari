@@ -493,6 +493,7 @@ names are generic.
 
 | Script | What it does | Needs first |
 |---|---|---|
+| `setup-live-server.bat` | Sets up the free Vercel server in one go: publishes the rules and indexes, takes the service-account key file you download and stores it in Vercel as `FIREBASE_SERVICE_ACCOUNT` (straight from the file, never shown), sets `BOOTSTRAP_ADMIN_EMAIL`, redeploys and checks `/api/health` | the Vercel CLI signed in |
 | `deploy-database.bat` | Signs in to Firebase (browser *Allow*) and publishes the security rules and the 60 indexes to `prahari-2` | — (free plan) |
 | `deploy-backend.bat` | The same, plus the storage rules and every Cloud Function | Blaze plan; Storage opened once (*Get started*, `us-central1`) |
 | `publish-ai.bat` | Signs in to Hugging Face (paste a Write token), uploads the AI service and models as the public Space `<user>/prahari-ai`, waits until it serves, then points the website at it (Vercel env + rebuild) | a free Hugging Face account |
