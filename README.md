@@ -497,6 +497,7 @@ names are generic.
 | `deploy-database.bat` | Signs in to Firebase (browser *Allow*) and publishes the security rules and the 60 indexes to `prahari-2` | — (free plan) |
 | `deploy-backend.bat` | The same, plus the storage rules and every Cloud Function | Blaze plan; Storage opened once (*Get started*, `us-central1`) |
 | `publish-ai.bat` | Signs in to Hugging Face (paste a Write token), uploads the AI service and models as the public Space `<user>/prahari-ai`, waits until it serves, then points the website at it (Vercel env + rebuild) | a free Hugging Face account |
+| `start-ai-for-phones.bat` | Lets phones use the AI on this computer: starts the service, opens a Cloudflare quick tunnel to it (no account; `cloudflared.exe` in `E:\dev-cache\cloudflared`), sets `VITE_PPE_INFERENCE_URL` in Vercel and rebuilds the site. Works while its window stays open; the address is new each time | Vercel CLI signed in |
 | `start-ai.bat` | Runs the AI service on this computer only (until the Space exists) | — |
 
 After `deploy-backend.bat`: sign in on the site with the bootstrap address and open
