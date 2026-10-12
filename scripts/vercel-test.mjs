@@ -9,6 +9,11 @@
  * runtime around it — except that the key is generated here, is worth nothing,
  * and everything talks to the Auth and Firestore emulators.
  *
+ * Node runs with --no-experimental-require-module, because Vercel's loader does
+ * not let CommonJS require() an ES module either: a dependency that relies on it
+ * (jwks-rsa → jose 6, pinned to 5.x in functions/package.json for that reason)
+ * loads on a laptop and crashes there.
+ *
  * The npm script starts those two emulators itself, without the Functions
  * emulator: on this route nothing but the request scores a report, and the
  * test proves it. Stop `npm run emulators` first (same ports).
@@ -274,7 +279,7 @@ console.log('\nA deployment that is not set up');
   // A key that is not a key is noticed when the server starts, so each case is a fresh process.
   const probe = fileURLToPath(new URL('./lib/vercel-probe.mjs', import.meta.url));
   const start = (key) => {
-    const out = spawnSync(process.execPath, [probe], { env: { ...process.env, VERCEL: '1', FIREBASE_SERVICE_ACCOUNT: key }, encoding: 'utf8' });
+    const out = spawnSync(process.execPath, ['--no-experimental-require-module', probe], { env: { ...process.env, VERCEL: '1', FIREBASE_SERVICE_ACCOUNT: key }, encoding: 'utf8' });
     try {
       return JSON.parse(out.stdout);
     } catch {
