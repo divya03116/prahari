@@ -109,6 +109,31 @@ function newCameraId(): string {
   return `cam_${[...a].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * The evidence frame, the way this deployment keeps it: uploaded to Cloud
+ * Storage, or — where there is none — sent with the incident as a small JPEG
+ * (same picture, same proportions, so the boxes drawn over it still line up).
+ */
+async function evidenceFor(frame: HTMLCanvasElement, uid: string, reportId: string) {
+  const jpeg = (canvas: HTMLCanvasElement, quality: number) =>
+    new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('encode'))), 'image/jpeg', quality));
+  if (uploadsEnabled) {
+    const blob = await jpeg(frame, 0.9);
+    const path = `attachments/${uid}/${reportId}/evidence-frame.jpg`;
+    const { task } = await startUpload(path, new File([blob], 'evidence-frame.jpg', { type: 'image/jpeg' }));
+    await task;
+    return { evidence: { path, name: 'evidence-frame.jpg', size: blob.size, contentType: 'image/jpeg' } };
+  }
+  const small = document.createElement('canvas');
+  const scale = Math.min(1, 640 / frame.width);
+  small.width = Math.round(frame.width * scale);
+  small.height = Math.round(frame.height * scale);
+  small.getContext('2d')!.drawImage(frame, 0, 0, small.width, small.height);
+  let binary = '';
+  for (const byte of new Uint8Array(await (await jpeg(small, 0.6)).arrayBuffer())) binary += String.fromCharCode(byte);
+  return { evidenceImage: btoa(binary) };
+}
+
 function loadConfig(): StationConfig {
   const base: StationConfig = {
     cameraId: newCameraId(),
@@ -127,7 +152,15 @@ function loadConfig(): StationConfig {
   };
   try {
     const saved = JSON.parse(localStorage.getItem(CONFIG_KEY) ?? 'null') as Partial<StationConfig> | null;
-    return saved ? { ...base, ...saved, settings: { ...base.settings, ...saved.settings } } : base;
+    if (!saved) return base;
+    const settings = { ...base.settings, ...saved.settings };
+    // A station saved with the first defaults (ten frames, two seconds) moves to
+    // the current ones: at a frame a second, ten frames meant ten seconds.
+    if (saved.settings?.confirmationFrames === 10 && saved.settings?.violationSeconds === 2) {
+      settings.confirmationFrames = base.settings.confirmationFrames;
+      settings.violationSeconds = base.settings.violationSeconds;
+    }
+    return { ...base, ...saved, settings };
   } catch {
     return base;
   }
@@ -363,14 +396,11 @@ export default function Monitoring() {
 
   const fileIncident = useCallback(
     async (events: ViolationEvent[], statuses: WorkerStatus[], frame: HTMLCanvasElement) => {
-      if (!user || !ppeModel || !uploadsEnabled) return;
+      if (!user || !ppeModel) return;
       const c = cfgRef.current; // the camera name may have been filled in automatically after start
       const reportId = doc(collection(firebase.db, COLLECTIONS.reports)).id;
       try {
-        const blob = await new Promise<Blob>((res, rej) => frame.toBlob((b) => (b ? res(b) : rej(new Error('encode'))), 'image/jpeg', 0.9));
-        const path = `attachments/${user.uid}/${reportId}/evidence-frame.jpg`;
-        const { task } = await startUpload(path, new File([blob], 'evidence-frame.jpg', { type: 'image/jpeg' }));
-        await task;
+        const evidence = await evidenceFor(frame, user.uid, reportId);
         const result = await api.createPpeIncident({
           reportId,
           installationId: c.installationId,
@@ -391,7 +421,7 @@ export default function Monitoring() {
             ),
           })),
           frame: { width: frame.width, height: frame.height },
-          evidence: { path, name: 'evidence-frame.jpg', size: blob.size, contentType: 'image/jpeg' },
+          ...evidence,
           model: { name: ppeModel.name, architecture: ppeModel.architecture, backend: 'remote', classes: ppeModel.classes },
           settings: c.settings,
           required,
@@ -411,15 +441,12 @@ export default function Monitoring() {
 
   const fileHazard = useCallback(
     async (e: HazardEvent, frame: HTMLCanvasElement) => {
-      if (!user || !info || !uploadsEnabled) return;
+      if (!user || !info) return;
       const c = cfgRef.current;
       const reportId = doc(collection(firebase.db, COLLECTIONS.reports)).id;
       const label = HAZARDS[e.type].label;
       try {
-        const blob = await new Promise<Blob>((res, rej) => frame.toBlob((b) => (b ? res(b) : rej(new Error('encode'))), 'image/jpeg', 0.9));
-        const path = `attachments/${user.uid}/${reportId}/evidence-frame.jpg`;
-        const { task } = await startUpload(path, new File([blob], 'evidence-frame.jpg', { type: 'image/jpeg' }));
-        await task;
+        const evidence = await evidenceFor(frame, user.uid, reportId);
         // The models that looked at this frame (the PPE model only if it supplied the people).
         const used = info.models.filter((m) => rolesRef.current.includes(m.role));
         const hazardModels = used.filter((m) => m.role !== 'ppe');
@@ -439,7 +466,7 @@ export default function Monitoring() {
             ...(e.method ? { method: e.method } : {}),
           },
           frame: { width: frame.width, height: frame.height },
-          evidence: { path, name: 'evidence-frame.jpg', size: blob.size, contentType: 'image/jpeg' },
+          ...evidence,
           models: (hazardModels.length ? hazardModels : used).map((m) => ({ role: m.role, name: m.name, architecture: m.architecture })),
           settings: { minConfidence: c.hazardConfidence, incidentCooldownSeconds: c.settings.incidentCooldownSeconds },
           geo: null,
@@ -818,7 +845,6 @@ export default function Monitoring() {
               }
             />
             <PanelBody className="flex flex-col gap-3">
-              {!uploadsEnabled && <Alert tone="warning">{tr('mon.noStorage')}</Alert>}
               {camError && <Alert tone="critical">{camError}</Alert>}
               {detectError && <Alert tone="warning">{detectError}</Alert>}
               <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border bg-black">
