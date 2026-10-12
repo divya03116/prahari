@@ -1034,5 +1034,4 @@ export const bn: Record<MessageKey, string> = {
 
   // a deployment without file storage
   'attach.off': 'এই সাইটে এখনও ছবি ও ফাইল যুক্ত করা যায় না: এর ফাইল স্টোরেজ সেট আপ করা হয়নি।',
-  'mon.noStorage': 'এই সাইট থেকে এখনও ঘটনা দাখিল হয় না: প্রমাণের ছবি রাখার জায়গা নেই। শনাক্তকরণ শুধু স্ক্রিনে দেখানো হয়।',
 };

@@ -53,10 +53,16 @@ export interface PpeSettings {
   incidentCooldownSeconds: number;
 }
 
+/*
+ * Three frames and three seconds: a missing item is confirmed, and its incident
+ * filed, within about six seconds whether the camera is checked ten times a
+ * second or once. (The first defaults asked for ten frames, which a phone
+ * sending one frame a second took ten seconds to reach.)
+ */
 export const DEFAULT_PPE_SETTINGS: PpeSettings = {
   minConfidence: 0.6,
-  confirmationFrames: 10,
-  violationSeconds: 2,
+  confirmationFrames: 3,
+  violationSeconds: 3,
   incidentCooldownSeconds: 300,
 };
 

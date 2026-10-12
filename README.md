@@ -534,9 +534,11 @@ What this route does not have, and what the site does about it:
 
 - **No file storage.** A new Firebase project cannot create a Storage bucket on
   the free plan. With `VITE_UPLOADS=off` the report forms offer no attachment,
-  the photo report is hidden, and live monitoring shows what it detects but files
-  no incident (an incident must carry its evidence frame). Reports by voice and
-  text, scoring, actions, verdicts, alerts, PDF export and offline use all work.
+  and the photo report is hidden. Camera incidents are still filed: the evidence
+  frame travels with the call as a small JPEG (640 px, at most about 200 kB) and
+  is kept beside the report in `reports/{id}/evidence/frame`, readable by whoever
+  may read the report. Reports by voice and text, scoring, actions, verdicts,
+  alerts, PDF export and offline use all work.
 - **No scheduled jobs.** The daily orphan-attachment sweep does not run; without
   Storage there is nothing for it to sweep.
 - **One scorer.** If you later deploy the Cloud Functions as well, remove
@@ -645,7 +647,9 @@ If you use a custom `authDomain`, add it to `frame-src` in the CSP in `firebase.
   wear; *missing* is decided by the rule engine from the PPE required at that
   camera. The dataset's `no_helmet`-style classes are dropped at preparation time.
 - **Settings** (saved in the monitoring browser): minimum confidence (default
-  **0.60**), confirmation frames (**10**), violation duration (**2 s**), incident
+  **0.60**), confirmation frames (**3**), violation duration (**3 s**) — so a
+  missing item is confirmed and its incident filed within about six seconds,
+  whether the camera is checked ten times a second or once — incident
   cooldown (**300 s**), and which PPE is required at this camera. PPE the loaded
   model cannot detect is marked *Not in this model* and cannot be required, so it
   is never assumed missing.
@@ -775,10 +779,10 @@ time the app, not that cold start.
 | `npm run typecheck` | Strict TypeScript across app, tests and tooling |
 | `npm run test:engine` | 14 fixtures land on the expected tier (incl. Hindi and Assamese) |
 | `npm run test:ppe` | 22 checks of the PPE rule engine: YOLO decoding, letterbox, NMS, PPE-to-worker association, tracking, multi-frame/duration confirmation, cooldown, and incident structuring (“Not specified”, no invented details) |
-| `npm run test:rules` | 117 adversarial checks with real tokens: Firestore rules, Storage rules, who may read which report/action/attachment (own, installation, whole register, list queries), phone and Apple accounts (verified, own-only, no email in a phone profile), the one-time first-admin claim, callable authorisation and scoping, camera PPE and hazard incidents (types, zones, forged keys, deduplication), photo reports and statements, and Tier 1 alert records and preferences (officers read, nobody forges, nobody sets their own channels directly) |
+| `npm run test:rules` | 126 adversarial checks with real tokens: Firestore rules, Storage rules, who may read which report/action/attachment (own, installation, whole register, list queries), phone and Apple accounts (verified, own-only, no email in a phone profile), the one-time first-admin claim, callable authorisation and scoping, camera PPE and hazard incidents (types, zones, forged keys, deduplication), photo reports and statements, and Tier 1 alert records and preferences (officers read, nobody forges, nobody sets their own channels directly) |
 | `npm run test:alerts` | 41 checks of Tier 1 alerts with the email and WhatsApp providers replaced by a local stand-in server: message content (narrative as written, escaped, reporter never identified), who is told, number validation, Resend and Brevo request shapes, the WhatsApp template call, and honest results for *not configured*, partial failure and total failure |
 | `npm run test:cleanup` | The orphan-attachment sweep deletes only what it should |
-| `npm run test:vercel` | 54 checks of the Vercel server route. The real functions in `api/` are served locally and called with plain HTTP and with the Firebase web SDK, the Admin SDK set up from a (throwaway) service-account key as on Vercel: only listed callables are reachable; 401 / 403 / 400 / 409 with the server's own sentences; a report is scored, its actions opened and its Tier 1 alert recorded **by the time the reply arrives**, and never twice; the first-administrator claim; a missing or mis-pasted key answers 503 without echoing it. Starts its own Auth and Firestore emulators — stop `npm run emulators` first |
+| `npm run test:vercel` | 65 checks of the Vercel server route (camera incidents that carry their evidence frame among them). The real functions in `api/` are served locally and called with plain HTTP and with the Firebase web SDK, the Admin SDK set up from a (throwaway) service-account key as on Vercel: only listed callables are reachable; 401 / 403 / 400 / 409 with the server's own sentences; a report is scored, its actions opened and its Tier 1 alert recorded **by the time the reply arrives**, and never twice; the first-administrator claim; a missing or mis-pasted key answers 503 without echoing it. Starts its own Auth and Firestore emulators — stop `npm run emulators` first |
 | `npm run test:e2e` | 61 Playwright tests (4 are opt-in with the real models, 1 needs the production build): auth flows (sign-up → verify → sign-in, reset, bad links, open redirect; Google/Apple/phone offered; phone sign-in with an SMS code from the Auth emulator, wrong code refused), full report lifecycle with upload, register search/filters/pagination, verdicts and actions, admin users/reference/audit, role guards, report visibility (a reviewer sees only their own; a manager only their installation's), dashboard, voice/text reporting with GPS and structuring, speech fallback, camera start/stop with a real (fake-device) stream (and starting by itself once a refused camera permission is allowed) and honest *AI Model Not Configured* status, combined camera + statement incidents, layout at 375 / 768 / 1280 / 1440 / 1920 px with no horizontal page scroll and the phone tab bar; the four interface languages (sign-in, menu, register, a report, the hazard report, the dashboard — and that a report's text is identical before and after switching); PDF export (a real PDF is produced; the printed document in English and Hindi); reporting offline with a photo and automatic sending on reconnect; Tier 1 alert settings and the record of what was sent; any console error fails a test |
 | `PREVIEW=1 npm run test:e2e` | The same suite against the production build (`npm run build` first) with the CSP enforced and the service worker active — including that the app opens with no connection |
 | `npm test` | engine + PPE + hazards + alerts + rules + cleanup + E2E |
@@ -831,8 +835,9 @@ time the app, not that cold start.
   times; the evidence frame lets an officer dismiss a false alarm in seconds.
 - **Licensing:** the PPE dataset and Ultralytics YOLO are AGPL-3.0 (see
   `ai/README.md`).
-- **The live site has no file storage** (free plan): no attachments, no photo
-  report, no camera incidents there — see
+- **The live site has no file storage** (free plan): no attachments and no photo
+  report there, and a camera incident keeps a small evidence frame in the
+  database instead of the full-size one — see
   [The server on Vercel](#the-server-on-vercel-no-blaze-plan).
 - **Dependency advisories.** `npm audit --omit=dev` reports **0** for the web app
   and for `functions/`. The Firebase web SDK pins an old `@grpc/grpc-js` for its

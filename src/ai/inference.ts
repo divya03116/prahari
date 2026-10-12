@@ -127,7 +127,7 @@ async function post(image: Blob, roles: ModelRole[] | undefined, signal?: AbortS
 /** Sends one frame (already drawn on a canvas) to the chosen models. */
 export async function detectFrame(frame: HTMLCanvasElement, signal?: AbortSignal, roles?: ModelRole[]): Promise<FrameResult> {
   const blob = await new Promise<Blob>((resolve, reject) =>
-    frame.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode the frame.'))), 'image/jpeg', 0.85),
+    frame.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode the frame.'))), 'image/jpeg', 0.7),
   );
   return post(blob, roles, signal, { width: frame.width, height: frame.height });
 }
