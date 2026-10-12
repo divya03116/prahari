@@ -1044,6 +1044,9 @@ export const en = {
 
   // ------------------------------------------------------------------ a deployment without file storage
   'attach.off': 'Photos and files cannot be attached on this site yet: its file storage is not set up.',
+
+  // ------------------------------------------------------------------ what each worker was missing
+  'incident.alsoInFrame': 'also not seen in this frame: {items}',
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof en;

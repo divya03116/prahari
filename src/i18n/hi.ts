@@ -1036,4 +1036,7 @@ export const hi: Record<MessageKey, string> = {
 
   // a deployment without file storage
   'attach.off': 'इस साइट पर अभी फ़ोटो और फ़ाइलें नहीं जोड़ी जा सकतीं: इसका फ़ाइल स्टोरेज सेट अप नहीं है।',
+
+  // what each worker was missing
+  'incident.alsoInFrame': 'इस फ़्रेम में यह भी नहीं दिखा: {items}',
 };

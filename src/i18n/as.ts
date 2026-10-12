@@ -1037,4 +1037,7 @@ export const as: Record<MessageKey, string> = {
 
   // a deployment without file storage
   'attach.off': 'এই ছাইটত এতিয়াও ফটো আৰু ফাইল সংলগ্ন কৰিব নোৱাৰি: ইয়াৰ ফাইল ষ্ট’ৰেজ ছেট আপ কৰা হোৱা নাই।',
+
+  // what each worker was missing
+  'incident.alsoInFrame': 'এই ফ্ৰেমত এইবোৰো দেখা নগ’ল: {items}',
 };

@@ -15,7 +15,7 @@ import { Timestamp, type DocumentReference, type Transaction } from 'firebase-ad
 import { audit, db, FieldValue, guard, internal, parse, rateLimit } from '../lib/core.js';
 import { COLLECTIONS } from '../shared/constants.js';
 import { describeHazard, HAZARDS } from '../shared/hazards.js';
-import { PPE_LABEL, type PpeType } from '../shared/ppe.js';
+import { missingByWorker, PPE_LABEL, type PpeType } from '../shared/ppe.js';
 import { hazardIncidentSchema, ppeIncidentSchema, statementSchema } from '../shared/schemas.js';
 import { verifyUploads } from './reports.js';
 
@@ -62,8 +62,19 @@ function describe(input: ReturnType<typeof ppeIncidentSchema.parse>, types: PpeT
   const workers = new Set(input.violations.filter((v) => types.includes(v.type)).map((v) => v.trackId)).size;
   const longest = Math.max(...input.violations.filter((v) => types.includes(v.type)).map((v) => v.seconds));
   const frames = Math.max(...input.violations.filter((v) => types.includes(v.type)).map((v) => v.frames));
+  // Who was missing what: said worker by worker when there are several, and
+  // anything else a worker was without in the evidence frame said as just that.
+  const names = (items: PpeType[]) => items.map((t) => PPE_LABEL[t].toLowerCase()).join(', ');
+  const each = missingByWorker({ ...input, violations: input.violations.filter((v) => types.includes(v.type)) });
+  const byWorker = each.length > 1 ? `Worker by worker: ${each.map((w) => `worker ${w.trackId} — ${names(w.confirmed)}`).join('; ')}. ` : '';
+  const also = each
+    .filter((w) => w.alsoInFrame.length)
+    .map((w) => `${each.length > 1 ? `worker ${w.trackId}` : 'the worker'} without ${names(w.alsoInFrame)}`)
+    .join('; ');
   return (
     `Camera "${input.camera.label}" detected ${workers === 1 ? 'a worker' : `${workers} workers`} without the required ${missing}. ` +
+    byWorker +
+    (also ? `The evidence frame also shows ${also} (seen in that frame, not confirmed over time). ` : '') +
     `Confirmed over ${frames} consecutive frames (${longest.toFixed(1)} s) by the ${input.model.name} model ` +
     `(${input.model.architecture}, minimum confidence ${input.settings.minConfidence}).`
   );

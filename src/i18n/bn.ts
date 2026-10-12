@@ -1034,4 +1034,7 @@ export const bn: Record<MessageKey, string> = {
 
   // a deployment without file storage
   'attach.off': 'এই সাইটে এখনও ছবি ও ফাইল যুক্ত করা যায় না: এর ফাইল স্টোরেজ সেট আপ করা হয়নি।',
+
+  // what each worker was missing
+  'incident.alsoInFrame': 'এই ফ্রেমে এগুলোও দেখা যায়নি: {items}',
 };

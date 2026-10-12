@@ -255,6 +255,25 @@ console.log('\nCamera incidents without Cloud Storage');
   const huge = await post('createPpeIncident', { ...ppe(), evidenceImage: 'A'.repeat(300_000) }, worker.token);
   check('an oversized frame is refused (400)', huge.status === 400, show(huge));
 
+  // The report says who was missing what — and keeps what was only seen once apart from what was confirmed.
+  const two = {
+    ...ppe(),
+    camera: { ...camera, id: `${camera.id}_two` },
+    violations: [
+      { type: 'helmet', trackId: 1, personConfidence: 0.9, frames: 4, seconds: 3.1 },
+      { type: 'vest', trackId: 2, personConfidence: 0.88, frames: 5, seconds: 3.6 },
+    ],
+    workers: [
+      { trackId: 1, box: { x1: 10, y1: 10, x2: 60, y2: 200 }, confidence: 0.9, ppe: { helmet: { state: 'missing', confidence: null }, vest: { state: 'present', confidence: 0.8 }, gloves: { state: 'missing', confidence: null } } },
+      { trackId: 2, box: { x1: 200, y1: 10, x2: 260, y2: 200 }, confidence: 0.88, ppe: { helmet: { state: 'present', confidence: 0.9 }, vest: { state: 'missing', confidence: null }, gloves: { state: 'present', confidence: 0.7 } } },
+    ],
+    required: ['helmet', 'vest', 'gloves'],
+  };
+  await post('createPpeIncident', two, worker.token);
+  const told = String((await db.collection('reports').doc(two.reportId).get()).get('text'));
+  check('the report names what is missing, worker by worker', /2 workers without the required safety helmet and safety vest\. Worker by worker: worker 1 — safety helmet; worker 2 — safety vest\./.test(told), told);
+  check('and what a worker was also without in the frame, as seen once', /also shows worker 1 without gloves \(seen in that frame, not confirmed over time\)/.test(told) && !/worker 2 without/.test(told), told);
+
   const fire = {
     reportId: newId(),
     installationId: SITE,

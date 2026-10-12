@@ -23,7 +23,7 @@ import { api } from '@/services/callables';
 import { evidenceUrl } from '@/services/storage';
 import { LIMITS } from '@/shared/constants';
 import { HAZARDS } from '@/shared/hazards';
-import type { PpeType } from '@/shared/ppe';
+import { missingByWorker, type PpeType } from '@/shared/ppe';
 import { NOT_SPECIFIED, type ReportSource, type StructuredIncident } from '@/shared/structure';
 import type { ReportDoc, WithId } from '@/shared/types';
 
@@ -113,6 +113,7 @@ export function CameraEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
 
   if (!ppe) return null;
   const violated = new Set(ppe.violations.map((v) => v.trackId));
+  const items = (list: PpeType[]) => list.map((item) => t(ppeKey(item))).join(', ');
 
   return (
     <Panel>
@@ -122,6 +123,18 @@ export function CameraEvidencePanel({ report }: { report: WithId<ReportDoc> }) {
         actions={<SourceBadge source="camera" />}
       />
       <PanelBody className="flex flex-col gap-4">
+        {/* The first thing a reader needs: who was missing what. */}
+        <div className="rounded-xl border border-critical-line bg-critical-soft px-4 py-3">
+          <p className="text-sm font-semibold text-fg">{t('incident.missingPpe')}</p>
+          <ul className="mt-1 flex flex-col gap-0.5 text-sm text-fg">
+            {missingByWorker(ppe).map((w) => (
+              <li key={w.trackId}>
+                {t('incident.worker', { id: w.trackId })}: <strong className="font-semibold text-critical">{items(w.confirmed)}</strong>
+                {w.alsoInFrame.length > 0 && <span className="text-fg-muted"> · {t('incident.alsoInFrame', { items: items(w.alsoInFrame) })}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
         <div className="relative overflow-hidden rounded-xl border border-border bg-canvas" style={{ aspectRatio: `${ppe.frame.width} / ${ppe.frame.height}` }}>
           {url ? (
             <img src={url} alt={t('incident.camera.altViolation')} className="absolute inset-0 size-full object-contain" />
