@@ -16,7 +16,8 @@ if not errorlevel 1 (
   exit /b 0
 )
 title PRAHARI AI inference - keep this window open
-rem CPU keeps memory use low on this laptop; set PPE_DEVICE=0 to use the GPU.
+rem CPU keeps memory use low on this laptop (about 0.4 s a frame). PPE_DEVICE=0 uses the GPU and is
+rem faster, but it held about 6.5 GB of memory here and left too little for anything else.
 set PPE_DEVICE=cpu
 set PPE_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173,https://prahari-silk.vercel.app
 set YOLO_CONFIG_DIR=E:\prahari-ml\tmp\Ultralytics

@@ -127,6 +127,7 @@ if not exist "E:\prahari-ml\venv\Scripts\python.exe" (
 "%SystemRoot%\System32\curl.exe" -s -o nul http://127.0.0.1:8765/v1/health >nul 2>nul
 if not errorlevel 1 exit /b 0
 echo Starting the PPE inference service in a new window...
-rem CPU keeps memory use low on this laptop; set PPE_DEVICE=0 to use the GPU.
+rem CPU keeps memory use low on this laptop (about 0.4 s a frame). PPE_DEVICE=0 uses the GPU and is
+rem faster, but it held about 6.5 GB of memory here and left too little for anything else.
 start "PRAHARI AI inference - keep this window open" cmd /k "set PPE_DEVICE=cpu&& set PPE_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:4173,http://localhost:4173,https://prahari-silk.vercel.app&& "E:\prahari-ml\venv\Scripts\python.exe" ai\inference_service\server.py"
 exit /b 0
