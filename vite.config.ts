@@ -75,6 +75,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
     },
+    // The browser AI runtime finds its WebAssembly beside its own module; pre-bundling would move one without the other.
+    optimizeDeps: { exclude: ['onnxruntime-web'] },
     // strictPort: if 5173 is taken, fail loudly rather than drift to 5174,
     // where the bookmarked address would no longer find the app.
     server: { host: '127.0.0.1', port: 5173, strictPort: true },

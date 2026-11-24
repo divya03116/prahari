@@ -15,6 +15,8 @@
 const VERSION = '__VERSION__';
 const CACHE = `prahari-${VERSION}`;
 const SHELL = '/index.html';
+/** The AI models, kept across versions: they change only when re-exported, and then their address changes too. */
+const MODELS = 'prahari-models';
 const PRECACHE = __PRECACHE__;
 
 self.addEventListener('install', (event) => {
@@ -33,7 +35,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('prahari-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('prahari-') && k !== CACHE && k !== MODELS).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -49,6 +51,33 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   // Firebase Auth's own helper pages, and the server functions some deployments host on this site.
   if (url.pathname.startsWith('/__/') || url.pathname.startsWith('/api/')) return;
+
+  // The AI models: each file is fetched once and kept (its size is in its
+  // address, so a new export is a new file). The list of models is asked for
+  // every time, and the last copy is used offline.
+  if (url.pathname.startsWith('/models/')) {
+    event.respondWith(
+      caches.open(MODELS).then(async (cache) => {
+        if (url.pathname.endsWith('.onnx')) {
+          const hit = await cache.match(request);
+          if (hit) return hit;
+          const response = await fetch(request);
+          if (response.ok) cache.put(request, response.clone()).catch(() => undefined);
+          return response;
+        }
+        try {
+          const response = await fetch(request);
+          if (response.ok) cache.put(request, response.clone()).catch(() => undefined);
+          return response;
+        } catch (err) {
+          const hit = await cache.match(request, { ignoreVary: true });
+          if (hit) return hit;
+          throw err;
+        }
+      }),
+    );
+    return;
+  }
 
   // Every route is the same single page: serve it from the cache at once.
   if (request.mode === 'navigate') {

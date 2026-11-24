@@ -5,6 +5,7 @@ import { AlertTriangle, Camera, CameraOff, CheckCircle2, Cpu, PenLine, Play, Ref
 
 import { useAuth } from '@/auth/AuthProvider';
 import { cameraSupport, describeCameraError, listCameras, openCamera, stopStream } from '@/ai/camera';
+import { preloadModels } from '@/ai/browser';
 import { detectFrame, getModelStatus, INFERENCE_URL, modelFor, type ModelInfo, type ModelRole, type ModelStatus } from '@/ai/inference';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -199,6 +200,7 @@ export default function Monitoring() {
   const [running, setRunning] = useState(false);
   const [camError, setCamError] = useState<string | null>(null);
   const [detectError, setDetectError] = useState<string | null>(null);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [workers, setWorkers] = useState<WorkerStatus[]>([]);
   const [perf, setPerf] = useState({ fps: 0, ms: 0 });
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -422,7 +424,7 @@ export default function Monitoring() {
           })),
           frame: { width: frame.width, height: frame.height },
           ...evidence,
-          model: { name: ppeModel.name, architecture: ppeModel.architecture, backend: 'remote', classes: ppeModel.classes },
+          model: { name: ppeModel.name, architecture: ppeModel.architecture, backend: ppeModel.backend ?? 'remote', classes: ppeModel.classes },
           settings: c.settings,
           required,
           geo: null,
@@ -491,6 +493,18 @@ export default function Monitoring() {
 
   const runLoop = useCallback(async () => {
     const L = loop.current;
+    // Models that run in this browser are downloaded the first time they are
+    // used; say so rather than look idle while they arrive.
+    if (!INFERENCE_URL && rolesRef.current.length) {
+      setLoadingModels(true);
+      try {
+        await preloadModels(rolesRef.current);
+      } catch (err) {
+        setDetectError(errorMessage(err, (err as Error).message || translate('mon.err.detect')));
+      } finally {
+        setLoadingModels(false);
+      }
+    }
     const frame = document.createElement('canvas');
     const times: number[] = [];
     while (L.active) {
@@ -846,6 +860,7 @@ export default function Monitoring() {
             />
             <PanelBody className="flex flex-col gap-3">
               {camError && <Alert tone="critical">{camError}</Alert>}
+              {loadingModels && <Alert tone="info">{tr('mon.loadingModels')}</Alert>}
               {detectError && <Alert tone="warning">{detectError}</Alert>}
               <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border bg-black">
                 <video ref={videoRef} muted playsInline className={cn('absolute inset-0 size-full object-contain', streamMode && cfg.streamFormat === 'mjpeg' && 'hidden')} />

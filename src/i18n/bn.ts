@@ -1037,4 +1037,9 @@ export const bn: Record<MessageKey, string> = {
 
   // what each worker was missing
   'incident.alsoInFrame': 'এই ফ্রেমে এগুলোও দেখা যায়নি: {items}',
+
+  // AI models running in the browser
+  'ai.browserFailed': 'AI মডেলগুলো এই ব্রাউজারে লোড করা গেল না: {error}',
+  'mon.loadingModels':
+    'AI মডেলগুলো এই ব্রাউজারে লোড হচ্ছে। প্রথমবার একটু সময় লাগে (প্রায় 50 MB পর্যন্ত); তারপর সেগুলো সঙ্গে সঙ্গে খোলে, অফলাইনেও।',
 };

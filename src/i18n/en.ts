@@ -1047,6 +1047,11 @@ export const en = {
 
   // ------------------------------------------------------------------ what each worker was missing
   'incident.alsoInFrame': 'also not seen in this frame: {items}',
+
+  // ------------------------------------------------------------------ AI models running in the browser
+  'ai.browserFailed': 'The AI models could not be loaded in this browser: {error}',
+  'mon.loadingModels':
+    'Loading the AI models into this browser. The first time takes a moment (up to about 50 MB); after that they open at once, even offline.',
 } as const satisfies Record<string, string>;
 
 export type MessageKey = keyof typeof en;

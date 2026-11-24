@@ -1,15 +1,19 @@
 /**
- * Client for the inference service (ai/inference_service/server.py).
+ * Where the site's YOLO models run.
  *
- * The browser captures frames or photos; the service runs the site's YOLO
- * models wherever it is deployed (this laptop, a GPU server, a cloud VM, an
- * edge box) and returns raw detections, each tagged with the model that made
- * it. The app never fabricates a detection: if no service URL is set, the
- * service is unreachable, or a model has no evaluation, the status says so.
+ * By default, in this browser (./browser.ts): the models ship with the site and
+ * run on the device itself, so the camera AI works on any phone or computer
+ * with no server. When VITE_PPE_INFERENCE_URL is set, frames go to that
+ * inference service (ai/inference_service/server.py) instead — a GPU server,
+ * a cloud VM or an edge box next to the cameras. Either way detections come
+ * back tagged with the model that made them, and the app never fabricates
+ * one: a model that cannot load or a service that cannot be reached says so.
  */
 
 import { translate } from '@/i18n';
 import type { HazardDetection } from '@/shared/hazards';
+
+import { browserStatus, detectInBrowser } from './browser';
 
 export const INFERENCE_URL = (import.meta.env.VITE_PPE_INFERENCE_URL || '').replace(/\/$/, '');
 const TOKEN = import.meta.env.VITE_PPE_INFERENCE_TOKEN || '';
@@ -37,6 +41,8 @@ export interface LoadedModel {
   classes: string[];
   keypoints: boolean;
   device: 'gpu' | 'cpu';
+  /** 'webgpu' / 'wasm': running in this browser · 'remote': on the inference service. */
+  backend?: 'webgpu' | 'wasm' | 'remote';
   metrics: ModelMetrics | null;
 }
 
@@ -64,9 +70,7 @@ const headers = (): HeadersInit => (TOKEN ? { Authorization: `Bearer ${TOKEN}` }
 export const modelFor = (info: ModelInfo, role: ModelRole) => info.models.find((m) => m.role === role) ?? null;
 
 export async function getModelStatus(): Promise<ModelStatus> {
-  if (!INFERENCE_URL) {
-    return { state: 'not-configured', reason: translate('ai.notConfigured') };
-  }
+  if (!INFERENCE_URL) return browserStatus();
   let res: Response;
   try {
     res = await fetch(`${INFERENCE_URL}/v1/model`, { headers: headers(), cache: 'no-store' });
@@ -124,15 +128,22 @@ async function post(image: Blob, roles: ModelRole[] | undefined, signal?: AbortS
   };
 }
 
-/** Sends one frame (already drawn on a canvas) to the chosen models. */
+/** Runs the chosen models on one frame (already drawn on a canvas). */
 export async function detectFrame(frame: HTMLCanvasElement, signal?: AbortSignal, roles?: ModelRole[]): Promise<FrameResult> {
+  if (!INFERENCE_URL) return detectInBrowser(frame, frame.width, frame.height, roles, signal);
   const blob = await new Promise<Blob>((resolve, reject) =>
     frame.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode the frame.'))), 'image/jpeg', 0.7),
   );
   return post(blob, roles, signal, { width: frame.width, height: frame.height });
 }
 
-/** Sends a photo (JPEG/PNG/WebP up to 8 MB) to the chosen models. */
-export function detectImage(image: Blob, roles?: ModelRole[], signal?: AbortSignal): Promise<FrameResult> {
-  return post(image, roles, signal);
+/** Runs the chosen models on a photo (JPEG/PNG/WebP up to 8 MB). */
+export async function detectImage(image: Blob, roles?: ModelRole[], signal?: AbortSignal): Promise<FrameResult> {
+  if (INFERENCE_URL) return post(image, roles, signal);
+  const bitmap = await createImageBitmap(image);
+  try {
+    return await detectInBrowser(bitmap, bitmap.width, bitmap.height, roles, signal);
+  } finally {
+    bitmap.close();
+  }
 }

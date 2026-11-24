@@ -1039,4 +1039,9 @@ export const hi: Record<MessageKey, string> = {
 
   // what each worker was missing
   'incident.alsoInFrame': 'इस फ़्रेम में यह भी नहीं दिखा: {items}',
+
+  // AI models running in the browser
+  'ai.browserFailed': 'AI मॉडल इस ब्राउज़र में लोड नहीं हो सके: {error}',
+  'mon.loadingModels':
+    'AI मॉडल इस ब्राउज़र में लोड हो रहे हैं। पहली बार थोड़ा समय लगता है (लगभग 50 MB तक); उसके बाद वे तुरंत खुलते हैं, ऑफ़लाइन भी।',
 };

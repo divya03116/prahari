@@ -83,6 +83,8 @@ test.describe('live monitoring without an inference service', () => {
   test('honest model status; the camera starts by itself and respects Stop', async ({ page }) => {
   // Make sure the service is absent even if one is running on this machine.
   await page.route(/\/v1\/(model|health|detect)$/, (route) => route.abort('connectionrefused'));
+  // …and with no models shipped with the site either.
+  await page.route(/\/models\/manifest\.json$/, (route) => route.abort('connectionrefused'));
   await signIn(page, 'officer');
   await page.goto('/app/monitoring');
   await expect(page.getByRole('heading', { name: 'Live safety monitoring' })).toBeVisible();

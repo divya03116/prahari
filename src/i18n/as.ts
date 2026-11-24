@@ -1040,4 +1040,9 @@ export const as: Record<MessageKey, string> = {
 
   // what each worker was missing
   'incident.alsoInFrame': 'এই ফ্ৰেমত এইবোৰো দেখা নগ’ল: {items}',
+
+  // AI models running in the browser
+  'ai.browserFailed': 'AI মডেলবোৰ এই ব্ৰাউজাৰত ল’ড কৰিব পৰা নগ’ল: {error}',
+  'mon.loadingModels':
+    'AI মডেলবোৰ এই ব্ৰাউজাৰত ল’ড হৈ আছে। প্ৰথমবাৰ অলপ সময় লাগে (প্ৰায় 50 MB পৰ্যন্ত); তাৰ পিছত সেইবোৰ লগে লগে খোল খায়, অফলাইনতো।',
 };

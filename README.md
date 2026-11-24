@@ -410,7 +410,7 @@ Hindi/Assamese/Bengali words work) supports whole-word `array-contains` search.
 | `VITE_USE_EMULATORS` | `true` to use the local emulator suite |
 | `VITE_FUNCTIONS_ORIGIN` | Leave out when the server is Cloud Functions. A path on the site (`/api/fn`) or a URL: the callables are then called there instead. Set for the Vercel build in `vercel.json` |
 | `VITE_UPLOADS` | `off` when the project has no Cloud Storage bucket: nothing offers to attach a file, and camera incidents (which need an evidence frame) are not filed. Set for the Vercel build in `vercel.json` |
-| `VITE_PPE_INFERENCE_URL` | Base URL of the PPE inference service (e.g. `http://127.0.0.1:8765`). Empty → monitoring shows *AI Model Not Configured*. In production also add it to `connect-src` in the CSP in `firebase.json` |
+| `VITE_PPE_INFERENCE_URL` | Leave empty (the default, and the live site): the models run in each visitor's browser. Set it to the base URL of an inference service (e.g. a GPU server next to the cameras) to send frames there instead; then also add it to `connect-src` in the CSP |
 | `VITE_PPE_INFERENCE_TOKEN` | Optional shared secret; must match `PPE_TOKEN` on the service |
 
 For the Vercel build (`npm run build:vercel`) the same variables go in `.env.vercel`
@@ -497,7 +497,7 @@ names are generic.
 | `deploy-database.bat` | Signs in to Firebase (browser *Allow*) and publishes the security rules and the 60 indexes to `prahari-2` | — (free plan) |
 | `deploy-backend.bat` | The same, plus the storage rules and every Cloud Function | Blaze plan; Storage opened once (*Get started*, `us-central1`) |
 | `publish-ai.bat` | Signs in to Hugging Face (paste a Write token), uploads the AI service and models as the public Space `<user>/prahari-ai`, waits until it serves, then points the website at it (Vercel env + rebuild) | a free Hugging Face account |
-| `start-ai-for-phones.bat` | Lets phones use the AI on this computer: starts the service, opens a Cloudflare quick tunnel to it (no account; `cloudflared.exe` in `E:\dev-cache\cloudflared`), sets `VITE_PPE_INFERENCE_URL` in Vercel and rebuilds the site. Works while its window stays open; the address is new each time | Vercel CLI signed in |
+| `start-ai-for-phones.bat` | Not needed any more (the models run in each browser). Kept for a site configured with `VITE_PPE_INFERENCE_URL`: lets phones use the AI on this computer: starts the service, opens a Cloudflare quick tunnel to it (no account; `cloudflared.exe` in `E:\dev-cache\cloudflared`), sets `VITE_PPE_INFERENCE_URL` in Vercel and rebuilds the site. Works while its window stays open; the address is new each time | Vercel CLI signed in |
 | `start-ai.bat` | Runs the AI service on this computer only (until the Space exists) | — |
 
 After `deploy-backend.bat`: sign in on the site with the bootstrap address and open
@@ -586,9 +586,13 @@ To try the route on your own machine, see `npm run test:vercel` and
    ```
 7. As that admin, add installations and activities under *Reference data*.
 
-**The PPE/hazard inference service**, for the hosted site, runs as a Hugging Face
-Space (Docker, CPU) so any device — phones included — can use the models. The
-Space definition is in [`ai/space/`](ai/space/README.md):
+**The models for the site** ship with it: after retraining, run
+`python ai/web/export_web.py` and commit `public/models/`. Nothing else is needed
+for any device to use them.
+
+**Optionally, an inference service** — for many cameras or slow devices — can
+run as a Hugging Face Space (Docker, CPU). The Space definition is in
+[`ai/space/`](ai/space/README.md):
 ```bash
 python ai/space/stage.py                       # server + weights + metrics → E:/prahari-ml/space-build
 hf auth login                                  # once, with a Write token
@@ -613,10 +617,31 @@ If you use a custom `authDomain`, add it to `frame-src` in the CSP in `firebase.
 
 ## 12. AI safety features
 
+### Where the models run
+
+**In the browser, on the device itself** — the default, and how the live site
+works. `python ai/web/export_web.py` exports the trained models (PPE `ppe-v2`:
+person, helmet, vest, gloves, boots, goggles; `general-coco`: people, vehicles,
+objects; `pose-coco`: posture; `fire-v1`: fire and smoke) to ONNX in
+`public/models/` with a manifest of their classes and test metrics, and
+`src/ai/browser.ts` runs them with onnxruntime-web: on the graphics chip through
+WebGPU where the device has one, on its processor through WebAssembly otherwise.
+No server, account or laptop is involved and no frame leaves the device. The
+models (about 48 MB in all, only the ones a camera needs) and the runtime are
+downloaded once, kept by the browser and the service worker, and then open at
+once, offline too. Measured here: about 6 frames a second with all four models
+on a laptop graphics chip; about 0.3 s per frame for the PPE model on a
+processor alone. Phones vary with their chip.
+
+**On an inference service**, when `VITE_PPE_INFERENCE_URL` is set: the same
+models served by `ai/inference_service/server.py` on a GPU box, a cloud VM or
+the Hugging Face Space below — for many cameras, or devices too slow to run the
+models themselves.
+
 ### Live safety monitoring (`/app/monitoring`)
 
 ```
- camera ──► browser frame grab ──► inference service (YOLO) ──► raw detections
+ camera ──► browser frame grab ──► YOLO models (in the browser, or the service) ──► raw detections
                                                                     │
    functions/src/shared/ppe.ts (same code in browser and tests)  ◄──┘
      worker detection  → persons ≥ min confidence, tracked across frames (IoU tracker)
@@ -656,10 +681,10 @@ If you use a custom `authDomain`, add it to `frame-src` in the CSP in `firebase.
 - **No duplicate incidents:** the browser reports each continuing violation once,
   and `createPpeIncident` enforces the cooldown per camera and PPE type in a
   Firestore transaction, returning the existing incident instead of a new one.
-- **Honest status:** if `VITE_PPE_INFERENCE_URL` is empty, the service is
-  unreachable, or it has no evaluated model, the page shows **AI Model Not
-  Configured** (with the reason) and the camera runs with detection off. Nothing
-  is simulated.
+- **Honest status:** if the models cannot be loaded in the browser, or a
+  configured service is unreachable or has no evaluated model, the page shows
+  **AI Model Not Configured** (with the reason) and the camera runs with
+  detection off. Nothing is simulated.
 
 ### Unsafe acts, unsafe conditions and near misses
 
