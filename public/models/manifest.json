@@ -1,0 +1,365 @@
+{
+  "imgsz": 640,
+  "models": [
+    {
+      "role": "ppe",
+      "name": "ppe-v2",
+      "architecture": "YOLO26",
+      "file": "ppe-v2.onnx",
+      "bytes": 9797481,
+      "imgsz": 640,
+      "layout": "yolov8",
+      "output": [
+        1,
+        10,
+        8400
+      ],
+      "classes": [
+        "person",
+        "helmet",
+        "vest",
+        "gloves",
+        "boots",
+        "goggles"
+      ],
+      "keypoints": false,
+      "metrics": {
+        "weights": "E:\\prahari-ml\\runs\\ppe-v2\\weights\\best.pt",
+        "data": "E:\\prahari-ml\\datasets\\ppe-v1\\data.yaml",
+        "imgsz": 640,
+        "val": {
+          "precision": 0.8546,
+          "recall": 0.7798,
+          "mAP50": 0.8373,
+          "mAP50_95": 0.4474,
+          "per_class": {
+            "person": {
+              "precision": 0.9085,
+              "recall": 0.8726,
+              "mAP50": 0.9165,
+              "mAP50_95": 0.5019
+            },
+            "helmet": {
+              "precision": 0.8313,
+              "recall": 0.801,
+              "mAP50": 0.8264,
+              "mAP50_95": 0.4306
+            },
+            "vest": {
+              "precision": 0.8497,
+              "recall": 0.7953,
+              "mAP50": 0.8482,
+              "mAP50_95": 0.5145
+            },
+            "gloves": {
+              "precision": 0.8357,
+              "recall": 0.8015,
+              "mAP50": 0.8131,
+              "mAP50_95": 0.3965
+            },
+            "boots": {
+              "precision": 0.7863,
+              "recall": 0.7086,
+              "mAP50": 0.7915,
+              "mAP50_95": 0.4518
+            },
+            "goggles": {
+              "precision": 0.9164,
+              "recall": 0.6998,
+              "mAP50": 0.8282,
+              "mAP50_95": 0.3891
+            }
+          },
+          "speed_ms_per_image": {
+            "preprocess": 0.85,
+            "inference": 8.43,
+            "loss": 0.0,
+            "postprocess": 1.03
+          }
+        },
+        "test": {
+          "precision": 0.8622,
+          "recall": 0.7745,
+          "mAP50": 0.8232,
+          "mAP50_95": 0.4342,
+          "per_class": {
+            "person": {
+              "precision": 0.8279,
+              "recall": 0.7839,
+              "mAP50": 0.8151,
+              "mAP50_95": 0.4808
+            },
+            "helmet": {
+              "precision": 0.937,
+              "recall": 0.8906,
+              "mAP50": 0.9311,
+              "mAP50_95": 0.5107
+            },
+            "vest": {
+              "precision": 0.8993,
+              "recall": 0.8532,
+              "mAP50": 0.8991,
+              "mAP50_95": 0.573
+            },
+            "gloves": {
+              "precision": 0.84,
+              "recall": 0.7086,
+              "mAP50": 0.7463,
+              "mAP50_95": 0.3402
+            },
+            "boots": {
+              "precision": 0.7694,
+              "recall": 0.7204,
+              "mAP50": 0.7704,
+              "mAP50_95": 0.3853
+            },
+            "goggles": {
+              "precision": 0.8997,
+              "recall": 0.6903,
+              "mAP50": 0.7774,
+              "mAP50_95": 0.315
+            }
+          },
+          "speed_ms_per_image": {
+            "preprocess": 0.71,
+            "inference": 5.43,
+            "loss": 0.0,
+            "postprocess": 0.9
+          }
+        }
+      }
+    },
+    {
+      "role": "general",
+      "name": "general-coco",
+      "architecture": "YOLOv8",
+      "file": "general-coco.onnx",
+      "bytes": 12851105,
+      "imgsz": 640,
+      "layout": "yolov8",
+      "output": [
+        1,
+        84,
+        8400
+      ],
+      "classes": [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "airplane",
+        "bus",
+        "train",
+        "truck",
+        "boat",
+        "traffic light",
+        "fire hydrant",
+        "stop sign",
+        "parking meter",
+        "bench",
+        "bird",
+        "cat",
+        "dog",
+        "horse",
+        "sheep",
+        "cow",
+        "elephant",
+        "bear",
+        "zebra",
+        "giraffe",
+        "backpack",
+        "umbrella",
+        "handbag",
+        "tie",
+        "suitcase",
+        "frisbee",
+        "skis",
+        "snowboard",
+        "sports ball",
+        "kite",
+        "baseball bat",
+        "baseball glove",
+        "skateboard",
+        "surfboard",
+        "tennis racket",
+        "bottle",
+        "wine glass",
+        "cup",
+        "fork",
+        "knife",
+        "spoon",
+        "bowl",
+        "banana",
+        "apple",
+        "sandwich",
+        "orange",
+        "broccoli",
+        "carrot",
+        "hot dog",
+        "pizza",
+        "donut",
+        "cake",
+        "chair",
+        "couch",
+        "potted plant",
+        "bed",
+        "dining table",
+        "toilet",
+        "tv",
+        "laptop",
+        "mouse",
+        "remote",
+        "keyboard",
+        "cell phone",
+        "microwave",
+        "oven",
+        "toaster",
+        "sink",
+        "refrigerator",
+        "book",
+        "clock",
+        "vase",
+        "scissors",
+        "teddy bear",
+        "hair drier",
+        "toothbrush"
+      ],
+      "keypoints": false,
+      "metrics": {
+        "weights": "E:\\prahari-ml\\models\\general-coco\\weights\\yolov8n.pt",
+        "published": {
+          "dataset": "COCO val2017",
+          "metric": "box mAP50-95",
+          "value": 0.373,
+          "source": "https://docs.ultralytics.com/models/yolov8/"
+        },
+        "site_person_check": {
+          "data": "ppe-v1 test split (141 images, 236 people)",
+          "confidence": 0.5,
+          "iou": 0.5,
+          "precision": 0.8153,
+          "recall": 0.7669
+        },
+        "test": {
+          "precision": 0.8153,
+          "recall": 0.7669
+        }
+      }
+    },
+    {
+      "role": "pose",
+      "name": "pose-coco",
+      "architecture": "YOLOv8",
+      "file": "pose-coco.onnx",
+      "bytes": 13514626,
+      "imgsz": 640,
+      "layout": "yolov8",
+      "output": [
+        1,
+        56,
+        8400
+      ],
+      "classes": [
+        "person"
+      ],
+      "keypoints": true,
+      "metrics": {
+        "weights": "E:\\prahari-ml\\models\\pose-coco\\weights\\yolov8n-pose.pt",
+        "published": {
+          "dataset": "COCO val2017 keypoints",
+          "metric": "pose mAP50-95 / mAP50",
+          "value": 0.504,
+          "mAP50": 0.801,
+          "source": "https://docs.ultralytics.com/models/yolov8/"
+        },
+        "site_person_check": {
+          "data": "ppe-v1 test split (141 images, 236 people)",
+          "confidence": 0.5,
+          "iou": 0.5,
+          "precision": 0.8243,
+          "recall": 0.7754
+        },
+        "test": {
+          "precision": 0.8243,
+          "recall": 0.7754
+        }
+      }
+    },
+    {
+      "role": "fire",
+      "name": "fire-v1",
+      "architecture": "YOLOv8",
+      "file": "fire-v1.onnx",
+      "bytes": 12266507,
+      "imgsz": 640,
+      "layout": "yolov8",
+      "output": [
+        1,
+        6,
+        8400
+      ],
+      "classes": [
+        "fire",
+        "smoke"
+      ],
+      "keypoints": false,
+      "metrics": {
+        "weights": "E:\\prahari-ml\\runs\\fire-v1\\weights\\best.pt",
+        "data": "E:\\prahari-ml\\datasets\\fire-v1\\data.yaml",
+        "imgsz": 640,
+        "val": {
+          "precision": 0.7515,
+          "recall": 0.6717,
+          "mAP50": 0.7473,
+          "mAP50_95": 0.4311,
+          "per_class": {
+            "fire": {
+              "precision": 0.6862,
+              "recall": 0.6111,
+              "mAP50": 0.6789,
+              "mAP50_95": 0.3547
+            },
+            "smoke": {
+              "precision": 0.8169,
+              "recall": 0.7324,
+              "mAP50": 0.8157,
+              "mAP50_95": 0.5075
+            }
+          },
+          "speed_ms_per_image": {
+            "preprocess": 1.49,
+            "inference": 35.3,
+            "loss": 0.0,
+            "postprocess": 0.31
+          }
+        },
+        "test": {
+          "precision": 0.6784,
+          "recall": 0.6328,
+          "mAP50": 0.6754,
+          "mAP50_95": 0.3764,
+          "per_class": {
+            "fire": {
+              "precision": 0.6053,
+              "recall": 0.5532,
+              "mAP50": 0.5905,
+              "mAP50_95": 0.29
+            },
+            "smoke": {
+              "precision": 0.7514,
+              "recall": 0.7124,
+              "mAP50": 0.7602,
+              "mAP50_95": 0.4627
+            }
+          },
+          "speed_ms_per_image": {
+            "preprocess": 1.44,
+            "inference": 34.17,
+            "loss": 0.0,
+            "postprocess": 0.35
+          }
+        }
+      }
+    }
+  ]
+}
